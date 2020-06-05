@@ -378,9 +378,7 @@ const _GET_INTERCEPTIONS: qmpi_sys::mpi_func = Some(get_interceptions);
 
 #[no_mangle]
 extern "C" fn get_interceptions(i: c_int) -> *mut c_char {
-    dbg!(("get_interceptions", i));
     if i == qmpi_sys::_MPI_funcs::_MPI_Pcontrol as c_int {
-        dbg!("MPI_Pcontrol() is not supported");
         // MPI_Pcontrol() is not supported
         "NULL"
     } else {
