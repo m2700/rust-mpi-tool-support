@@ -445,7 +445,7 @@ fn main() {
     );
     println!("cargo:rerun-if-changed={}", mpi_include_h_path.display());
 
-    if !mpi_bindings_path.exists() || mtime!(&mpi_bindings_path) < mtime!(file!()) {
+    if !mpi_bindings_path.exists() || mtime!(&mpi_bindings_path) < mtime!("build.rs") {
         let mpicc_output = Command::new("mpicc")
             .arg("-show")
             .output()

@@ -27,7 +27,7 @@ fn prepare_dir(path: &Path) {
         .unwrap();
 }
 async fn download_file(uri: Uri, file_path: &Path) {
-    if !file_path.exists() || mtime!(file_path) < mtime!(file!()) {
+    if !file_path.exists() || mtime!(file_path) < mtime!("build.rs") {
         let https_client: Client<_, hyper::Body> = Client::builder().build(HttpsConnector::new());
 
         let mut resp = https_client.get(uri).await.unwrap();
@@ -78,7 +78,7 @@ async fn main() {
         qmpi_bindings_path.display()
     );
 
-    prepare_dir(qmpi_root_path);
+    prepare_dir(&qmpi_root_path);
 
     #[cfg(feature = "bundled")]
     tokio_join!(
@@ -102,7 +102,7 @@ async fn main() {
         .extra_warnings(false)
         .compile("qmpi");
 
-    if !qmpi_bindings_path.exists() || mtime!(&qmpi_bindings_path) < mtime!(file!()) {
+    if !qmpi_bindings_path.exists() || mtime!(&qmpi_bindings_path) < mtime!("build.rs") {
         let mpicc_output = Command::new("mpicc")
             .arg("-show")
             .output()
