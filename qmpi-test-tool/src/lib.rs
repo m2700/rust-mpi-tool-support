@@ -11,6 +11,13 @@ impl QmpiLayer for MyQmpiLayer {
         println!("post_init: {}", output);
     }
 
+    fn pre_pcontrol(level: c_int) {
+        println!("pre_pcontrol({})", level);
+    }
+    fn post_pcontrol(output: c_int, level: c_int) {
+        println!("post_pcontrol({}): {}", level, output);
+    }
+
     fn pre_comm_size(_comm: mpi_sys::MPI_Comm, _size: *mut c_int) {
         println!("pre_comm_size");
     }

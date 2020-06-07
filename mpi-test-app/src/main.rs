@@ -5,7 +5,7 @@ use std::{
 
 use mpi_sys::{
     MPI_Barrier, MPI_Bcast, MPI_Comm_rank, MPI_Comm_size, MPI_Finalize, MPI_Init, MPI_COMM_WORLD,
-    MPI_INT,
+    MPI_INT,MPI_Pcontrol
 };
 
 fn main() {
@@ -13,7 +13,7 @@ fn main() {
         MPI_Init(ptr::null_mut(), ptr::null_mut());
         let mut rank: c_int = 0;
 
-        // MPI_Pcontrol(5); //not supported
+        MPI_Pcontrol(5); //not supported
 
         let mut gsize: c_int = 0;
         MPI_Comm_size(MPI_COMM_WORLD, &mut gsize);

@@ -378,12 +378,6 @@ const _GET_INTERCEPTIONS: qmpi_sys::mpi_func = Some(get_interceptions);
 
 #[no_mangle]
 extern "C" fn get_interceptions(i: c_int) -> *mut c_char {
-    if i == qmpi_sys::_MPI_funcs::_MPI_Pcontrol as c_int {
-        // MPI_Pcontrol() is not supported
-        "NULL"
-    } else {
-        &INTERCEPTIONS[i as usize]
-    }
     // make ptr mutable (in assumption the content is not going to be changed regardless)
-    .as_ptr() as *mut c_char
+    INTERCEPTIONS[i as usize].as_ptr() as *mut c_char
 }
