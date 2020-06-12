@@ -9,6 +9,6 @@ cargo build
 ```
 export TOOLS=`realpath target/debug/libqmpi_test_tool.dylib`
 cd mpi-test-app
-cargo run
+mpiexec cargo run
 ```
 (it might be libqmpi_test_tool.so for linux)
