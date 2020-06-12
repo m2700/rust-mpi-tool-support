@@ -66,10 +66,12 @@ with open("input.txt") as input_file:
                     )
 
                     trait_functions_output_file.write(
-                        "#[inline]fn " + pre_intercept_ident + "(" + ", ".join(rust_arg_line) + ") " + "{}\n"
+                        "#[inline]fn " + pre_intercept_ident + "(&mut self, "
+                         + ", ".join(rust_arg_line) + ") " + "{}\n"
                     )
                     trait_functions_output_file.write(
-                        "#[inline]fn " + post_intercept_ident + "(output: " + rust_res_tp + ", "
+                        "#[inline]fn " + post_intercept_ident
+                         + "(&mut self, output: " + rust_res_tp + ", "
                          + ", ".join(rust_arg_line) + ") " + "{}\n"
                     )
 

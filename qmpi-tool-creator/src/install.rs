@@ -1,15 +1,15 @@
 #[macro_export]
 macro_rules! install_layer {
-    (@pre( $layer:ty, $fn_intcpt:ident )
+    (@pre( $layer:ty, $fn_intcpt:ident, $intcpt_inst:ident )
         $fn_id:ident ( $($arg_id:ident),* )
     ) => (
-        <$layer as $crate::QmpiLayer>::$fn_intcpt( $($arg_id),* )
+        <$layer as $crate::QmpiLayer>::$fn_intcpt( &mut $intcpt_inst $(, $arg_id)* )
     );
 
-    (@post( $layer:ty, $fn_intcpt:ident )
+    (@post( $layer:ty, $fn_intcpt:ident, $intcpt_inst:ident )
         $fn_id:ident ( $($arg_id:ident),* ) -> $ret:expr
     ) => (
-        <$layer as $crate::QmpiLayer>::$fn_intcpt( $ret $(, $arg_id)* )
+        <$layer as $crate::QmpiLayer>::$fn_intcpt( &mut $intcpt_inst, $ret $(, $arg_id)* )
     );
 
     (@get_level $index:ident, $func_index:expr, $v:ident) => (
@@ -37,12 +37,13 @@ macro_rules! install_layer {
             >
              = ::std::mem::transmute(func_ptr);
 
-        $crate::install_layer!(@pre($layer, $fn_pre_intcpt)
+        let mut intcpt_inst = <$layer as Default>::default();
+        $crate::install_layer!(@pre($layer, $fn_pre_intcpt, intcpt_inst)
             $fn_id ( $($arg_id),* )
         );
         let func_ptr = func_ptr.expect("function pointer for execution is null, function can't be executed");
         let res = func_ptr( $( $arg_id ,)* level, v );
-        $crate::install_layer!(@post($layer, $fn_post_intcpt)
+        $crate::install_layer!(@post($layer, $fn_post_intcpt, intcpt_inst)
             $fn_id ( $($arg_id),* ) -> res
         );
         res
