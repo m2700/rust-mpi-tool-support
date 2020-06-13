@@ -459,6 +459,12 @@ fn main() {
         })
         .unwrap();
 
+        for mpicc_arg in mpicc_args.split(' ') {
+            if mpicc_arg.starts_with("-L") {
+                println!("cargo:rustc-link-search={}", &mpicc_arg[2..])
+            }
+        }
+
         let mut mpi_bindings = bindgen::builder()
             .header(mpi_include_h_path.to_string_lossy())
             .clang_args(mpicc_args.split(' '))
