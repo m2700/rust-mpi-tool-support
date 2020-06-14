@@ -3,9 +3,9 @@ use std::{
     ptr,
 };
 
-use mpi_sys::{
-    MPI_Barrier, MPI_Bcast, MPI_Comm_rank, MPI_Comm_size, MPI_Finalize, MPI_Init, MPI_COMM_WORLD,
-    MPI_INT,MPI_Pcontrol
+use qmpi_sys::mpi_sys::{
+    MPI_Barrier, MPI_Bcast, MPI_Comm_rank, MPI_Comm_size, MPI_Finalize, MPI_Init, MPI_Pcontrol,
+    MPI_COMM_WORLD, MPI_INT,
 };
 
 fn main() {

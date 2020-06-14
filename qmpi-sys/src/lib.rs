@@ -1,3 +1,5 @@
+pub use mpi_sys;
+
 mod c_qmpi {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]

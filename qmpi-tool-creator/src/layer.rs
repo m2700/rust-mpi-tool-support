@@ -1,5 +1,7 @@
 use std::os::raw::{c_char, c_double, c_int, c_void};
 
+use qmpi_sys::mpi_sys;
+
 #[allow(unused_variables)]
 pub trait QmpiLayer {
     #[inline]

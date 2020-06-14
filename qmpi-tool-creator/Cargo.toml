@@ -3,11 +3,9 @@ name = "qmpi-tool-creator"
 version = "0.1.0"
 authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
 edition = "2018"
-build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mpi-sys = { path = "../mpi-sys" }
 # QMPI_Table_query and vector_get are double linked
 qmpi-sys = { path = "../qmpi-sys", features = ["bundled"] }

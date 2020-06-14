@@ -459,9 +459,14 @@ fn main() {
         })
         .unwrap();
 
+        #[cfg(feature = "link_mpi")]
         for mpicc_arg in mpicc_args.split(' ') {
             if mpicc_arg.starts_with("-L") {
                 println!("cargo:rustc-link-search={}", &mpicc_arg[2..])
+            } else if mpicc_arg.starts_with("-l") {
+                println!("cargo:rustc-link-lib={}", &mpicc_arg[2..]);
+            } else {
+                //TODO
             }
         }
 
