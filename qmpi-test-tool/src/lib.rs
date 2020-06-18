@@ -5,68 +5,63 @@ use qmpi_tool_creator::{install_layer, mpi_sys, QmpiLayer};
 #[derive(Default)]
 struct MyQmpiLayer;
 impl QmpiLayer for MyQmpiLayer {
-    fn pre_init(&mut self, _argc: *mut c_int, _argv: *mut *mut *mut c_char) {
-        println!("pre_init");
+    fn init<F>(&self, next_f: F, argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_int
+    where
+        F: FnOnce(*mut c_int, *mut *mut *mut c_char) -> c_int,
+    {
+        println!("[called init(..)]");
+        next_f(argc, argv)
     }
-    fn post_init(&mut self, output: c_int, _argc: *mut c_int, _argv: *mut *mut *mut c_char) {
-        println!("post_init: {}", output);
+    fn pcontrol<F>(&self, next_f: F, level: c_int) -> c_int
+    where
+        F: FnOnce(c_int) -> c_int,
+    {
+        println!("[called pcontrol({})]", level);
+        println!("[call pcontrol({}) 'incremented']", level + 1);
+        next_f(level + 1)
     }
-
-    fn pre_pcontrol(&mut self, level: c_int) {
-        println!("pre_pcontrol({})", level);
+    fn comm_size<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, size: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        println!("[called comm_size(..)]");
+        next_f(comm, size)
     }
-    fn post_pcontrol(&mut self, output: c_int, level: c_int) {
-        println!("post_pcontrol({}): {}", level, output);
+    fn comm_rank<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, rank: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        println!("[called comm_rank(..)]");
+        next_f(comm, rank)
     }
-
-    fn pre_comm_size(&mut self, _comm: mpi_sys::MPI_Comm, _size: *mut c_int) {
-        println!("pre_comm_size");
+    fn bcast<F>(
+        &self,
+        next_f: F,
+        buffer: *mut c_void,
+        count: c_int,
+        datatype: mpi_sys::MPI_Datatype,
+        root: c_int,
+        comm: mpi_sys::MPI_Comm,
+    ) -> c_int
+    where
+        F: FnOnce(*mut c_void, c_int, mpi_sys::MPI_Datatype, c_int, mpi_sys::MPI_Comm) -> c_int,
+    {
+        println!("[called bcast(..)]");
+        next_f(buffer, count, datatype, root, comm)
     }
-    fn post_comm_size(&mut self, output: c_int, _comm: mpi_sys::MPI_Comm, _size: *mut c_int) {
-        println!("post_comm_size: {}", output);
+    fn barrier<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm) -> c_int,
+    {
+        println!("[called barrier(..)]");
+        next_f(comm)
     }
-
-    fn pre_comm_rank(&mut self, _comm: mpi_sys::MPI_Comm, _rank: *mut c_int) {
-        println!("pre_comm_rank");
-    }
-    fn post_comm_rank(&mut self, output: c_int, _comm: mpi_sys::MPI_Comm, _rank: *mut c_int) {
-        println!("post_comm_rank: {}", output);
-    }
-
-    fn pre_bcast(
-        &mut self,
-        _buffer: *mut c_void,
-        _count: c_int,
-        _datatype: mpi_sys::MPI_Datatype,
-        _root: c_int,
-        _comm: mpi_sys::MPI_Comm,
-    ) {
-        println!("pre_bcast");
-    }
-    fn post_bcast(
-        &mut self,
-        output: c_int,
-        _buffer: *mut c_void,
-        _count: c_int,
-        _datatype: mpi_sys::MPI_Datatype,
-        _root: c_int,
-        _comm: mpi_sys::MPI_Comm,
-    ) {
-        println!("post_bcast: {}", output);
-    }
-
-    fn pre_barrier(&mut self, _comm: mpi_sys::MPI_Comm) {
-        println!("pre_barrier");
-    }
-    fn post_barrier(&mut self, output: c_int, _comm: mpi_sys::MPI_Comm) {
-        println!("post_barrier: {}", output);
-    }
-
-    fn pre_finalize(&mut self) {
-        println!("pre_finalize");
-    }
-    fn post_finalize(&mut self, output: c_int) {
-        println!("post_finalize: {}", output);
+    fn finalize<F>(&self, next_f: F) -> c_int
+    where
+        F: FnOnce() -> c_int,
+    {
+        println!("[called finalize(..)]");
+        next_f()
     }
 }
 

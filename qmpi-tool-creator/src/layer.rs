@@ -5,12 +5,16 @@ use qmpi_sys::mpi_sys;
 #[allow(unused_variables)]
 pub trait QmpiLayer {
     #[inline]
-    fn pre_abort(&mut self, comm: mpi_sys::MPI_Comm, errorcode: c_int) {}
+    fn abort<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, errorcode: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int) -> c_int,
+    {
+        next_f(comm, errorcode)
+    }
     #[inline]
-    fn post_abort(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, errorcode: c_int) {}
-    #[inline]
-    fn pre_accumulate(
-        &mut self,
+    fn accumulate<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -20,48 +24,64 @@ pub trait QmpiLayer {
         target_datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            target_rank,
+            target_disp,
+            target_count,
+            target_datatype,
+            op,
+            win,
+        )
     }
     #[inline]
-    fn post_accumulate(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_count: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        win: mpi_sys::MPI_Win,
-    ) {
+    fn add_error_class<F>(&self, next_f: F, errorclass: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(errorclass)
     }
     #[inline]
-    fn pre_add_error_class(&mut self, errorclass: *mut c_int) {}
-    #[inline]
-    fn post_add_error_class(&mut self, output: c_int, errorclass: *mut c_int) {}
-    #[inline]
-    fn pre_add_error_code(&mut self, errorclass: c_int, errorcode: *mut c_int) {}
-    #[inline]
-    fn post_add_error_code(&mut self, output: c_int, errorclass: c_int, errorcode: *mut c_int) {}
-    #[inline]
-    fn pre_add_error_string(&mut self, errorcode: c_int, string: *const c_char) {}
-    #[inline]
-    fn post_add_error_string(&mut self, output: c_int, errorcode: c_int, string: *const c_char) {}
-    #[inline]
-    fn pre_address(&mut self, location: *mut c_void, address: *mut mpi_sys::MPI_Aint) {}
-    #[inline]
-    fn post_address(
-        &mut self,
-        output: c_int,
-        location: *mut c_void,
-        address: *mut mpi_sys::MPI_Aint,
-    ) {
+    fn add_error_code<F>(&self, next_f: F, errorclass: c_int, errorcode: *mut c_int) -> c_int
+    where
+        F: FnOnce(c_int, *mut c_int) -> c_int,
+    {
+        next_f(errorclass, errorcode)
     }
     #[inline]
-    fn pre_allgather(
-        &mut self,
+    fn add_error_string<F>(&self, next_f: F, errorcode: c_int, string: *const c_char) -> c_int
+    where
+        F: FnOnce(c_int, *const c_char) -> c_int,
+    {
+        next_f(errorcode, string)
+    }
+    #[inline]
+    fn address<F>(&self, next_f: F, location: *mut c_void, address: *mut mpi_sys::MPI_Aint) -> c_int
+    where
+        F: FnOnce(*mut c_void, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(location, address)
+    }
+    #[inline]
+    fn allgather<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -69,24 +89,26 @@ pub trait QmpiLayer {
         recvcount: c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
+        )
     }
     #[inline]
-    fn post_allgather(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_allgatherv(
-        &mut self,
+    fn allgatherv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -95,65 +117,63 @@ pub trait QmpiLayer {
         displs: *const c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm,
+        )
     }
     #[inline]
-    fn post_allgatherv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        displs: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_alloc_mem(
-        &mut self,
+    fn alloc_mem<F>(
+        &self,
+        next_f: F,
         size: mpi_sys::MPI_Aint,
         info: mpi_sys::MPI_Info,
         baseptr: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Aint, mpi_sys::MPI_Info, *mut c_void) -> c_int,
+    {
+        next_f(size, info, baseptr)
     }
     #[inline]
-    fn post_alloc_mem(
-        &mut self,
-        output: c_int,
-        size: mpi_sys::MPI_Aint,
-        info: mpi_sys::MPI_Info,
-        baseptr: *mut c_void,
-    ) {
-    }
-    #[inline]
-    fn pre_allreduce(
-        &mut self,
+    fn allreduce<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, comm)
     }
     #[inline]
-    fn post_allreduce(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_alltoall(
-        &mut self,
+    fn alltoall<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -161,24 +181,26 @@ pub trait QmpiLayer {
         recvcount: c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
+        )
     }
     #[inline]
-    fn post_alltoall(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_alltoallv(
-        &mut self,
+    fn alltoallv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const c_int,
@@ -188,26 +210,28 @@ pub trait QmpiLayer {
         rdispls: *const c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype, comm,
+        )
     }
     #[inline]
-    fn post_alltoallv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_alltoallw(
-        &mut self,
+    fn alltoallw<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const c_int,
@@ -217,109 +241,107 @@ pub trait QmpiLayer {
         rdispls: *const c_int,
         recvtypes: *const mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            *const mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            *const mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes, comm,
+        )
     }
     #[inline]
-    fn post_alltoallw(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const c_int,
-        sendtypes: *const mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const c_int,
-        recvtypes: *const mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
+    fn attr_delete<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, keyval: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int) -> c_int,
+    {
+        next_f(comm, keyval)
     }
     #[inline]
-    fn pre_attr_delete(&mut self, comm: mpi_sys::MPI_Comm, keyval: c_int) {}
-    #[inline]
-    fn post_attr_delete(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, keyval: c_int) {}
-    #[inline]
-    fn pre_attr_get(
-        &mut self,
-        comm: mpi_sys::MPI_Comm,
-        keyval: c_int,
-        attribute_val: *mut c_void,
-        flag: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn post_attr_get(
-        &mut self,
-        output: c_int,
+    fn attr_get<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         keyval: c_int,
         attribute_val: *mut c_void,
         flag: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *mut c_void, *mut c_int) -> c_int,
+    {
+        next_f(comm, keyval, attribute_val, flag)
     }
     #[inline]
-    fn pre_attr_put(&mut self, comm: mpi_sys::MPI_Comm, keyval: c_int, attribute_val: *mut c_void) {
-    }
-    #[inline]
-    fn post_attr_put(
-        &mut self,
-        output: c_int,
+    fn attr_put<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         keyval: c_int,
         attribute_val: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *mut c_void) -> c_int,
+    {
+        next_f(comm, keyval, attribute_val)
     }
     #[inline]
-    fn pre_barrier(&mut self, comm: mpi_sys::MPI_Comm) {}
+    fn barrier<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm)
+    }
     #[inline]
-    fn post_barrier(&mut self, output: c_int, comm: mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn pre_bcast(
-        &mut self,
+    fn bcast<F>(
+        &self,
+        next_f: F,
         buffer: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut c_void, c_int, mpi_sys::MPI_Datatype, c_int, mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(buffer, count, datatype, root, comm)
     }
     #[inline]
-    fn post_bcast(
-        &mut self,
-        output: c_int,
-        buffer: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_bsend(
-        &mut self,
+    fn bsend<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         dest: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm)
     }
     #[inline]
-    fn post_bsend(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_bsend_init(
-        &mut self,
+    fn bsend_init<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -327,579 +349,557 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn post_bsend_init(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
+    fn buffer_attach<F>(&self, next_f: F, buffer: *mut c_void, size: c_int) -> c_int
+    where
+        F: FnOnce(*mut c_void, c_int) -> c_int,
+    {
+        next_f(buffer, size)
     }
     #[inline]
-    fn pre_buffer_attach(&mut self, buffer: *mut c_void, size: c_int) {}
+    fn buffer_detach<F>(&self, next_f: F, buffer: *mut c_void, size: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_void, *mut c_int) -> c_int,
+    {
+        next_f(buffer, size)
+    }
     #[inline]
-    fn post_buffer_attach(&mut self, output: c_int, buffer: *mut c_void, size: c_int) {}
+    fn cancel<F>(&self, next_f: F, request: *mut mpi_sys::MPI_Request) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Request) -> c_int,
+    {
+        next_f(request)
+    }
     #[inline]
-    fn pre_buffer_detach(&mut self, buffer: *mut c_void, size: *mut c_int) {}
-    #[inline]
-    fn post_buffer_detach(&mut self, output: c_int, buffer: *mut c_void, size: *mut c_int) {}
-    #[inline]
-    fn pre_cancel(&mut self, request: *mut mpi_sys::MPI_Request) {}
-    #[inline]
-    fn post_cancel(&mut self, output: c_int, request: *mut mpi_sys::MPI_Request) {}
-    #[inline]
-    fn pre_cart_coords(
-        &mut self,
+    fn cart_coords<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         rank: c_int,
         maxdims: c_int,
         coords: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, rank, maxdims, coords)
     }
     #[inline]
-    fn post_cart_coords(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        rank: c_int,
-        maxdims: c_int,
-        coords: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_cart_create(
-        &mut self,
+    fn cart_create<F>(
+        &self,
+        next_f: F,
         old_comm: mpi_sys::MPI_Comm,
         ndims: c_int,
         dims: *const c_int,
         periods: *const c_int,
         reorder: c_int,
         comm_cart: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            c_int,
+            *const c_int,
+            *const c_int,
+            c_int,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(old_comm, ndims, dims, periods, reorder, comm_cart)
     }
     #[inline]
-    fn post_cart_create(
-        &mut self,
-        output: c_int,
-        old_comm: mpi_sys::MPI_Comm,
-        ndims: c_int,
-        dims: *const c_int,
-        periods: *const c_int,
-        reorder: c_int,
-        comm_cart: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_cart_get(
-        &mut self,
+    fn cart_get<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         maxdims: c_int,
         dims: *mut c_int,
         periods: *mut c_int,
         coords: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *mut c_int, *mut c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, maxdims, dims, periods, coords)
     }
     #[inline]
-    fn post_cart_get(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        maxdims: c_int,
-        dims: *mut c_int,
-        periods: *mut c_int,
-        coords: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_cart_map(
-        &mut self,
+    fn cart_map<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         ndims: c_int,
         dims: *const c_int,
         periods: *const c_int,
         newrank: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *const c_int, *const c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, ndims, dims, periods, newrank)
     }
     #[inline]
-    fn post_cart_map(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        ndims: c_int,
-        dims: *const c_int,
-        periods: *const c_int,
-        newrank: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_cart_rank(&mut self, comm: mpi_sys::MPI_Comm, coords: *const c_int, rank: *mut c_int) {}
-    #[inline]
-    fn post_cart_rank(
-        &mut self,
-        output: c_int,
+    fn cart_rank<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         coords: *const c_int,
         rank: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *const c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, coords, rank)
     }
     #[inline]
-    fn pre_cart_shift(
-        &mut self,
+    fn cart_shift<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         direction: c_int,
         disp: c_int,
         rank_source: *mut c_int,
         rank_dest: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, c_int, *mut c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, direction, disp, rank_source, rank_dest)
     }
     #[inline]
-    fn post_cart_shift(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        direction: c_int,
-        disp: c_int,
-        rank_source: *mut c_int,
-        rank_dest: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_cart_sub(
-        &mut self,
+    fn cart_sub<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         remain_dims: *const c_int,
         new_comm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *const c_int, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm, remain_dims, new_comm)
     }
     #[inline]
-    fn post_cart_sub(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        remain_dims: *const c_int,
-        new_comm: *mut mpi_sys::MPI_Comm,
-    ) {
+    fn cartdim_get<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, ndims: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(comm, ndims)
     }
     #[inline]
-    fn pre_cartdim_get(&mut self, comm: mpi_sys::MPI_Comm, ndims: *mut c_int) {}
+    fn close_port<F>(&self, next_f: F, port_name: *const c_char) -> c_int
+    where
+        F: FnOnce(*const c_char) -> c_int,
+    {
+        next_f(port_name)
+    }
     #[inline]
-    fn post_cartdim_get(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, ndims: *mut c_int) {}
-    #[inline]
-    fn pre_close_port(&mut self, port_name: *const c_char) {}
-    #[inline]
-    fn post_close_port(&mut self, output: c_int, port_name: *const c_char) {}
-    #[inline]
-    fn pre_comm_accept(
-        &mut self,
+    fn comm_accept<F>(
+        &self,
+        next_f: F,
         port_name: *const c_char,
         info: mpi_sys::MPI_Info,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_char,
+            mpi_sys::MPI_Info,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(port_name, info, root, comm, newcomm)
     }
     #[inline]
-    fn post_comm_accept(
-        &mut self,
-        output: c_int,
-        port_name: *const c_char,
-        info: mpi_sys::MPI_Info,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    fn comm_call_errhandler<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, errorcode: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int) -> c_int,
+    {
+        next_f(comm, errorcode)
     }
     #[inline]
-    fn pre_comm_call_errhandler(&mut self, comm: mpi_sys::MPI_Comm, errorcode: c_int) {}
-    #[inline]
-    fn post_comm_call_errhandler(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        errorcode: c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_compare(
-        &mut self,
+    fn comm_compare<F>(
+        &self,
+        next_f: F,
         comm1: mpi_sys::MPI_Comm,
         comm2: mpi_sys::MPI_Comm,
         result: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(comm1, comm2, result)
     }
     #[inline]
-    fn post_comm_compare(
-        &mut self,
-        output: c_int,
-        comm1: mpi_sys::MPI_Comm,
-        comm2: mpi_sys::MPI_Comm,
-        result: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_connect(
-        &mut self,
+    fn comm_connect<F>(
+        &self,
+        next_f: F,
         port_name: *const c_char,
         info: mpi_sys::MPI_Info,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_char,
+            mpi_sys::MPI_Info,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(port_name, info, root, comm, newcomm)
     }
     #[inline]
-    fn post_comm_connect(
-        &mut self,
-        output: c_int,
-        port_name: *const c_char,
-        info: mpi_sys::MPI_Info,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_create(
-        &mut self,
-        comm: mpi_sys::MPI_Comm,
-        group: mpi_sys::MPI_Group,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn post_comm_create(
-        &mut self,
-        output: c_int,
+    fn comm_create<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         group: mpi_sys::MPI_Group,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Group, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm, group, newcomm)
     }
     #[inline]
-    fn pre_comm_create_errhandler(
-        &mut self,
+    fn comm_create_errhandler<F>(
+        &self,
+        next_f: F,
         function: *mut mpi_sys::MPI_Comm_errhandler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut mpi_sys::MPI_Comm_errhandler_function,
+            *mut mpi_sys::MPI_Errhandler,
+        ) -> c_int,
+    {
+        next_f(function, errhandler)
     }
     #[inline]
-    fn post_comm_create_errhandler(
-        &mut self,
-        output: c_int,
-        function: *mut mpi_sys::MPI_Comm_errhandler_function,
-        errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_create_group(
-        &mut self,
+    fn comm_create_group<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         group: mpi_sys::MPI_Group,
         tag: c_int,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Group, c_int, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm, group, tag, newcomm)
     }
     #[inline]
-    fn post_comm_create_group(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        group: mpi_sys::MPI_Group,
-        tag: c_int,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_create_keyval(
-        &mut self,
+    fn comm_create_keyval<F>(
+        &self,
+        next_f: F,
         comm_copy_attr_fn: *mut mpi_sys::MPI_Comm_copy_attr_function,
         comm_delete_attr_fn: *mut mpi_sys::MPI_Comm_delete_attr_function,
         comm_keyval: *mut c_int,
         extra_state: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut mpi_sys::MPI_Comm_copy_attr_function,
+            *mut mpi_sys::MPI_Comm_delete_attr_function,
+            *mut c_int,
+            *mut c_void,
+        ) -> c_int,
+    {
+        next_f(
+            comm_copy_attr_fn,
+            comm_delete_attr_fn,
+            comm_keyval,
+            extra_state,
+        )
     }
     #[inline]
-    fn post_comm_create_keyval(
-        &mut self,
-        output: c_int,
-        comm_copy_attr_fn: *mut mpi_sys::MPI_Comm_copy_attr_function,
-        comm_delete_attr_fn: *mut mpi_sys::MPI_Comm_delete_attr_function,
-        comm_keyval: *mut c_int,
-        extra_state: *mut c_void,
-    ) {
+    fn comm_delete_attr<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, comm_keyval: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int) -> c_int,
+    {
+        next_f(comm, comm_keyval)
     }
     #[inline]
-    fn pre_comm_delete_attr(&mut self, comm: mpi_sys::MPI_Comm, comm_keyval: c_int) {}
-    #[inline]
-    fn post_comm_delete_attr(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        comm_keyval: c_int,
-    ) {
+    fn comm_disconnect<F>(&self, next_f: F, comm: *mut mpi_sys::MPI_Comm) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm)
     }
     #[inline]
-    fn pre_comm_disconnect(&mut self, comm: *mut mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn post_comm_disconnect(&mut self, output: c_int, comm: *mut mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn pre_comm_dup(&mut self, comm: mpi_sys::MPI_Comm, newcomm: *mut mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn post_comm_dup(
-        &mut self,
-        output: c_int,
+    fn comm_dup<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm, newcomm)
     }
     #[inline]
-    fn pre_comm_dup_with_info(
-        &mut self,
+    fn comm_dup_with_info<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         info: mpi_sys::MPI_Info,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Info, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm, info, newcomm)
     }
     #[inline]
-    fn post_comm_dup_with_info(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        info: mpi_sys::MPI_Info,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    fn comm_free<F>(&self, next_f: F, comm: *mut mpi_sys::MPI_Comm) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm)
     }
     #[inline]
-    fn pre_comm_free(&mut self, comm: *mut mpi_sys::MPI_Comm) {}
+    fn comm_free_keyval<F>(&self, next_f: F, comm_keyval: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(comm_keyval)
+    }
     #[inline]
-    fn post_comm_free(&mut self, output: c_int, comm: *mut mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn pre_comm_free_keyval(&mut self, comm_keyval: *mut c_int) {}
-    #[inline]
-    fn post_comm_free_keyval(&mut self, output: c_int, comm_keyval: *mut c_int) {}
-    #[inline]
-    fn pre_comm_get_attr(
-        &mut self,
+    fn comm_get_attr<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         comm_keyval: c_int,
         attribute_val: *mut c_void,
         flag: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *mut c_void, *mut c_int) -> c_int,
+    {
+        next_f(comm, comm_keyval, attribute_val, flag)
     }
     #[inline]
-    fn post_comm_get_attr(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        comm_keyval: c_int,
-        attribute_val: *mut c_void,
-        flag: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_get_errhandler(
-        &mut self,
+    fn comm_get_errhandler<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         erhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(comm, erhandler)
     }
     #[inline]
-    fn post_comm_get_errhandler(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        erhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_get_info(&mut self, comm: mpi_sys::MPI_Comm, info_used: *mut mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_comm_get_info(
-        &mut self,
-        output: c_int,
+    fn comm_get_info<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         info_used: *mut mpi_sys::MPI_Info,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(comm, info_used)
     }
     #[inline]
-    fn pre_comm_get_name(
-        &mut self,
+    fn comm_get_name<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         comm_name: *mut c_char,
         resultlen: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_char, *mut c_int) -> c_int,
+    {
+        next_f(comm, comm_name, resultlen)
     }
     #[inline]
-    fn post_comm_get_name(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        comm_name: *mut c_char,
-        resultlen: *mut c_int,
-    ) {
+    fn comm_get_parent<F>(&self, next_f: F, parent: *mut mpi_sys::MPI_Comm) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(parent)
     }
     #[inline]
-    fn pre_comm_get_parent(&mut self, parent: *mut mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn post_comm_get_parent(&mut self, output: c_int, parent: *mut mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn pre_comm_group(&mut self, comm: mpi_sys::MPI_Comm, group: *mut mpi_sys::MPI_Group) {}
-    #[inline]
-    fn post_comm_group(
-        &mut self,
-        output: c_int,
+    fn comm_group<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         group: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(comm, group)
     }
     #[inline]
-    fn pre_comm_idup(
-        &mut self,
+    fn comm_idup<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         newcomm: *mut mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Request) -> c_int,
+    {
+        next_f(comm, newcomm, request)
     }
     #[inline]
-    fn post_comm_idup(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        newcomm: *mut mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
+    fn comm_join<F>(&self, next_f: F, fd: c_int, intercomm: *mut mpi_sys::MPI_Comm) -> c_int
+    where
+        F: FnOnce(c_int, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(fd, intercomm)
     }
     #[inline]
-    fn pre_comm_join(&mut self, fd: c_int, intercomm: *mut mpi_sys::MPI_Comm) {}
+    fn comm_rank<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, rank: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(comm, rank)
+    }
     #[inline]
-    fn post_comm_join(&mut self, output: c_int, fd: c_int, intercomm: *mut mpi_sys::MPI_Comm) {}
-    #[inline]
-    fn pre_comm_rank(&mut self, comm: mpi_sys::MPI_Comm, rank: *mut c_int) {}
-    #[inline]
-    fn post_comm_rank(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, rank: *mut c_int) {}
-    #[inline]
-    fn pre_comm_remote_group(&mut self, comm: mpi_sys::MPI_Comm, group: *mut mpi_sys::MPI_Group) {}
-    #[inline]
-    fn post_comm_remote_group(
-        &mut self,
-        output: c_int,
+    fn comm_remote_group<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         group: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(comm, group)
     }
     #[inline]
-    fn pre_comm_remote_size(&mut self, comm: mpi_sys::MPI_Comm, size: *mut c_int) {}
+    fn comm_remote_size<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, size: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(comm, size)
+    }
     #[inline]
-    fn post_comm_remote_size(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, size: *mut c_int) {}
-    #[inline]
-    fn pre_comm_set_attr(
-        &mut self,
+    fn comm_set_attr<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         comm_keyval: c_int,
         attribute_val: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *mut c_void) -> c_int,
+    {
+        next_f(comm, comm_keyval, attribute_val)
     }
     #[inline]
-    fn post_comm_set_attr(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        comm_keyval: c_int,
-        attribute_val: *mut c_void,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_set_errhandler(
-        &mut self,
+    fn comm_set_errhandler<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         errhandler: mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(comm, errhandler)
     }
     #[inline]
-    fn post_comm_set_errhandler(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        errhandler: mpi_sys::MPI_Errhandler,
-    ) {
+    fn comm_set_info<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, info: mpi_sys::MPI_Info) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(comm, info)
     }
     #[inline]
-    fn pre_comm_set_info(&mut self, comm: mpi_sys::MPI_Comm, info: mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_comm_set_info(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        info: mpi_sys::MPI_Info,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_set_name(&mut self, comm: mpi_sys::MPI_Comm, comm_name: *const c_char) {}
-    #[inline]
-    fn post_comm_set_name(
-        &mut self,
-        output: c_int,
+    fn comm_set_name<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         comm_name: *const c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *const c_char) -> c_int,
+    {
+        next_f(comm, comm_name)
     }
     #[inline]
-    fn pre_comm_size(&mut self, comm: mpi_sys::MPI_Comm, size: *mut c_int) {}
+    fn comm_size<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, size: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(comm, size)
+    }
     #[inline]
-    fn post_comm_size(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, size: *mut c_int) {}
-    #[inline]
-    fn pre_comm_split(
-        &mut self,
+    fn comm_split<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         color: c_int,
         key: c_int,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, c_int, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(comm, color, key, newcomm)
     }
     #[inline]
-    fn post_comm_split(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        color: c_int,
-        key: c_int,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_comm_split_type(
-        &mut self,
+    fn comm_split_type<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         split_type: c_int,
         key: c_int,
         info: mpi_sys::MPI_Info,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Info,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(comm, split_type, key, info, newcomm)
     }
     #[inline]
-    fn post_comm_split_type(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        split_type: c_int,
-        key: c_int,
-        info: mpi_sys::MPI_Info,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    fn comm_test_inter<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, flag: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(comm, flag)
     }
     #[inline]
-    fn pre_comm_test_inter(&mut self, comm: mpi_sys::MPI_Comm, flag: *mut c_int) {}
-    #[inline]
-    fn post_comm_test_inter(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, flag: *mut c_int) {}
-    #[inline]
-    fn pre_compare_and_swap(
-        &mut self,
+    fn compare_and_swap<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         compare_addr: *const c_void,
         result_addr: *mut c_void,
@@ -907,28 +907,39 @@ pub trait QmpiLayer {
         target_rank: c_int,
         target_disp: mpi_sys::MPI_Aint,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_void,
+            *mut c_void,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            compare_addr,
+            result_addr,
+            datatype,
+            target_rank,
+            target_disp,
+            win,
+        )
     }
     #[inline]
-    fn post_compare_and_swap(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        compare_addr: *const c_void,
-        result_addr: *mut c_void,
-        datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        win: mpi_sys::MPI_Win,
-    ) {
+    fn dims_create<F>(&self, next_f: F, nnodes: c_int, ndims: c_int, dims: *mut c_int) -> c_int
+    where
+        F: FnOnce(c_int, c_int, *mut c_int) -> c_int,
+    {
+        next_f(nnodes, ndims, dims)
     }
     #[inline]
-    fn pre_dims_create(&mut self, nnodes: c_int, ndims: c_int, dims: *mut c_int) {}
-    #[inline]
-    fn post_dims_create(&mut self, output: c_int, nnodes: c_int, ndims: c_int, dims: *mut c_int) {}
-    #[inline]
-    fn pre_dist_graph_create(
-        &mut self,
+    fn dist_graph_create<F>(
+        &self,
+        next_f: F,
         comm_old: mpi_sys::MPI_Comm,
         n: c_int,
         nodes: *const c_int,
@@ -938,26 +949,28 @@ pub trait QmpiLayer {
         info: mpi_sys::MPI_Info,
         reorder: c_int,
         newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            c_int,
+            *const c_int,
+            *const c_int,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Info,
+            c_int,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            comm_old, n, nodes, degrees, targets, weights, info, reorder, newcomm,
+        )
     }
     #[inline]
-    fn post_dist_graph_create(
-        &mut self,
-        output: c_int,
-        comm_old: mpi_sys::MPI_Comm,
-        n: c_int,
-        nodes: *const c_int,
-        degrees: *const c_int,
-        targets: *const c_int,
-        weights: *const c_int,
-        info: mpi_sys::MPI_Info,
-        reorder: c_int,
-        newcomm: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_dist_graph_create_adjacent(
-        &mut self,
+    fn dist_graph_create_adjacent<F>(
+        &self,
+        next_f: F,
         comm_old: mpi_sys::MPI_Comm,
         indegree: c_int,
         sources: *const c_int,
@@ -968,27 +981,38 @@ pub trait QmpiLayer {
         info: mpi_sys::MPI_Info,
         reorder: c_int,
         comm_dist_graph: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            c_int,
+            *const c_int,
+            *const c_int,
+            c_int,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Info,
+            c_int,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            comm_old,
+            indegree,
+            sources,
+            sourceweights,
+            outdegree,
+            destinations,
+            destweights,
+            info,
+            reorder,
+            comm_dist_graph,
+        )
     }
     #[inline]
-    fn post_dist_graph_create_adjacent(
-        &mut self,
-        output: c_int,
-        comm_old: mpi_sys::MPI_Comm,
-        indegree: c_int,
-        sources: *const c_int,
-        sourceweights: *const c_int,
-        outdegree: c_int,
-        destinations: *const c_int,
-        destweights: *const c_int,
-        info: mpi_sys::MPI_Info,
-        reorder: c_int,
-        comm_dist_graph: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_dist_graph_neighbors(
-        &mut self,
+    fn dist_graph_neighbors<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         maxindegree: c_int,
         sources: *mut c_int,
@@ -996,126 +1020,132 @@ pub trait QmpiLayer {
         maxoutdegree: c_int,
         destinations: *mut c_int,
         destweights: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            c_int,
+            *mut c_int,
+            *mut c_int,
+            c_int,
+            *mut c_int,
+            *mut c_int,
+        ) -> c_int,
+    {
+        next_f(
+            comm,
+            maxindegree,
+            sources,
+            sourceweights,
+            maxoutdegree,
+            destinations,
+            destweights,
+        )
     }
     #[inline]
-    fn post_dist_graph_neighbors(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        maxindegree: c_int,
-        sources: *mut c_int,
-        sourceweights: *mut c_int,
-        maxoutdegree: c_int,
-        destinations: *mut c_int,
-        destweights: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_dist_graph_neighbors_count(
-        &mut self,
-        comm: mpi_sys::MPI_Comm,
-        inneighbors: *mut c_int,
-        outneighbors: *mut c_int,
-        weighted: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn post_dist_graph_neighbors_count(
-        &mut self,
-        output: c_int,
+    fn dist_graph_neighbors_count<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         inneighbors: *mut c_int,
         outneighbors: *mut c_int,
         weighted: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int, *mut c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, inneighbors, outneighbors, weighted)
     }
     #[inline]
-    fn pre_errhandler_create(
-        &mut self,
+    fn errhandler_create<F>(
+        &self,
+        next_f: F,
         function: *mut mpi_sys::MPI_Handler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Handler_function, *mut mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(function, errhandler)
     }
     #[inline]
-    fn post_errhandler_create(
-        &mut self,
-        output: c_int,
-        function: *mut mpi_sys::MPI_Handler_function,
-        errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    fn errhandler_free<F>(&self, next_f: F, errhandler: *mut mpi_sys::MPI_Errhandler) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(errhandler)
     }
     #[inline]
-    fn pre_errhandler_free(&mut self, errhandler: *mut mpi_sys::MPI_Errhandler) {}
-    #[inline]
-    fn post_errhandler_free(&mut self, output: c_int, errhandler: *mut mpi_sys::MPI_Errhandler) {}
-    #[inline]
-    fn pre_errhandler_get(
-        &mut self,
+    fn errhandler_get<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(comm, errhandler)
     }
     #[inline]
-    fn post_errhandler_get(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
-    }
-    #[inline]
-    fn pre_errhandler_set(&mut self, comm: mpi_sys::MPI_Comm, errhandler: mpi_sys::MPI_Errhandler) {
-    }
-    #[inline]
-    fn post_errhandler_set(
-        &mut self,
-        output: c_int,
+    fn errhandler_set<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         errhandler: mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(comm, errhandler)
     }
     #[inline]
-    fn pre_error_class(&mut self, errorcode: c_int, errorclass: *mut c_int) {}
+    fn error_class<F>(&self, next_f: F, errorcode: c_int, errorclass: *mut c_int) -> c_int
+    where
+        F: FnOnce(c_int, *mut c_int) -> c_int,
+    {
+        next_f(errorcode, errorclass)
+    }
     #[inline]
-    fn post_error_class(&mut self, output: c_int, errorcode: c_int, errorclass: *mut c_int) {}
-    #[inline]
-    fn pre_error_string(&mut self, errorcode: c_int, string: *mut c_char, resultlen: *mut c_int) {}
-    #[inline]
-    fn post_error_string(
-        &mut self,
-        output: c_int,
+    fn error_string<F>(
+        &self,
+        next_f: F,
         errorcode: c_int,
         string: *mut c_char,
         resultlen: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, *mut c_char, *mut c_int) -> c_int,
+    {
+        next_f(errorcode, string, resultlen)
     }
     #[inline]
-    fn pre_exscan(
-        &mut self,
+    fn exscan<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, comm)
     }
     #[inline]
-    fn post_exscan(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_fetch_and_op(
-        &mut self,
+    fn fetch_and_op<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         result_addr: *mut c_void,
         datatype: mpi_sys::MPI_Datatype,
@@ -1123,1032 +1153,998 @@ pub trait QmpiLayer {
         target_disp: mpi_sys::MPI_Aint,
         op: mpi_sys::MPI_Op,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            result_addr,
+            datatype,
+            target_rank,
+            target_disp,
+            op,
+            win,
+        )
     }
     #[inline]
-    fn post_fetch_and_op(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        result_addr: *mut c_void,
-        datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        op: mpi_sys::MPI_Op,
-        win: mpi_sys::MPI_Win,
-    ) {
+    fn file_call_errhandler<F>(&self, next_f: F, fh: mpi_sys::MPI_File, errorcode: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, c_int) -> c_int,
+    {
+        next_f(fh, errorcode)
     }
     #[inline]
-    fn pre_file_call_errhandler(&mut self, fh: mpi_sys::MPI_File, errorcode: c_int) {}
-    #[inline]
-    fn post_file_call_errhandler(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        errorcode: c_int,
-    ) {
+    fn file_close<F>(&self, next_f: F, fh: *mut mpi_sys::MPI_File) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_File) -> c_int,
+    {
+        next_f(fh)
     }
     #[inline]
-    fn pre_file_close(&mut self, fh: *mut mpi_sys::MPI_File) {}
-    #[inline]
-    fn post_file_close(&mut self, output: c_int, fh: *mut mpi_sys::MPI_File) {}
-    #[inline]
-    fn pre_file_create_errhandler(
-        &mut self,
+    fn file_create_errhandler<F>(
+        &self,
+        next_f: F,
         function: *mut mpi_sys::MPI_File_errhandler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut mpi_sys::MPI_File_errhandler_function,
+            *mut mpi_sys::MPI_Errhandler,
+        ) -> c_int,
+    {
+        next_f(function, errhandler)
     }
     #[inline]
-    fn post_file_create_errhandler(
-        &mut self,
-        output: c_int,
-        function: *mut mpi_sys::MPI_File_errhandler_function,
-        errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    fn file_delete<F>(&self, next_f: F, filename: *const c_char, info: mpi_sys::MPI_Info) -> c_int
+    where
+        F: FnOnce(*const c_char, mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(filename, info)
     }
     #[inline]
-    fn pre_file_delete(&mut self, filename: *const c_char, info: mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_file_delete(
-        &mut self,
-        output: c_int,
-        filename: *const c_char,
-        info: mpi_sys::MPI_Info,
-    ) {
+    fn file_get_amode<F>(&self, next_f: F, fh: mpi_sys::MPI_File, amode: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut c_int) -> c_int,
+    {
+        next_f(fh, amode)
     }
     #[inline]
-    fn pre_file_get_amode(&mut self, fh: mpi_sys::MPI_File, amode: *mut c_int) {}
+    fn file_get_atomicity<F>(&self, next_f: F, fh: mpi_sys::MPI_File, flag: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut c_int) -> c_int,
+    {
+        next_f(fh, flag)
+    }
     #[inline]
-    fn post_file_get_amode(&mut self, output: c_int, fh: mpi_sys::MPI_File, amode: *mut c_int) {}
-    #[inline]
-    fn pre_file_get_atomicity(&mut self, fh: mpi_sys::MPI_File, flag: *mut c_int) {}
-    #[inline]
-    fn post_file_get_atomicity(&mut self, output: c_int, fh: mpi_sys::MPI_File, flag: *mut c_int) {}
-    #[inline]
-    fn pre_file_get_byte_offset(
-        &mut self,
+    fn file_get_byte_offset<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         disp: *mut mpi_sys::MPI_Offset,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Offset, *mut mpi_sys::MPI_Offset) -> c_int,
+    {
+        next_f(fh, offset, disp)
     }
     #[inline]
-    fn post_file_get_byte_offset(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        disp: *mut mpi_sys::MPI_Offset,
-    ) {
-    }
-    #[inline]
-    fn pre_file_get_errhandler(
-        &mut self,
+    fn file_get_errhandler<F>(
+        &self,
+        next_f: F,
         file: mpi_sys::MPI_File,
         errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(file, errhandler)
     }
     #[inline]
-    fn post_file_get_errhandler(
-        &mut self,
-        output: c_int,
-        file: mpi_sys::MPI_File,
-        errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
-    }
-    #[inline]
-    fn pre_file_get_group(&mut self, fh: mpi_sys::MPI_File, group: *mut mpi_sys::MPI_Group) {}
-    #[inline]
-    fn post_file_get_group(
-        &mut self,
-        output: c_int,
+    fn file_get_group<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         group: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(fh, group)
     }
     #[inline]
-    fn pre_file_get_info(&mut self, fh: mpi_sys::MPI_File, info_used: *mut mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_file_get_info(
-        &mut self,
-        output: c_int,
+    fn file_get_info<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         info_used: *mut mpi_sys::MPI_Info,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(fh, info_used)
     }
     #[inline]
-    fn pre_file_get_position(&mut self, fh: mpi_sys::MPI_File, offset: *mut mpi_sys::MPI_Offset) {}
-    #[inline]
-    fn post_file_get_position(
-        &mut self,
-        output: c_int,
+    fn file_get_position<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: *mut mpi_sys::MPI_Offset,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Offset) -> c_int,
+    {
+        next_f(fh, offset)
     }
     #[inline]
-    fn pre_file_get_position_shared(
-        &mut self,
+    fn file_get_position_shared<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: *mut mpi_sys::MPI_Offset,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Offset) -> c_int,
+    {
+        next_f(fh, offset)
     }
     #[inline]
-    fn post_file_get_position_shared(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: *mut mpi_sys::MPI_Offset,
-    ) {
-    }
-    #[inline]
-    fn pre_file_get_size(&mut self, fh: mpi_sys::MPI_File, size: *mut mpi_sys::MPI_Offset) {}
-    #[inline]
-    fn post_file_get_size(
-        &mut self,
-        output: c_int,
+    fn file_get_size<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         size: *mut mpi_sys::MPI_Offset,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Offset) -> c_int,
+    {
+        next_f(fh, size)
     }
     #[inline]
-    fn pre_file_get_type_extent(
-        &mut self,
+    fn file_get_type_extent<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         datatype: mpi_sys::MPI_Datatype,
         extent: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(fh, datatype, extent)
     }
     #[inline]
-    fn post_file_get_type_extent(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        datatype: mpi_sys::MPI_Datatype,
-        extent: *mut mpi_sys::MPI_Aint,
-    ) {
-    }
-    #[inline]
-    fn pre_file_get_view(
-        &mut self,
+    fn file_get_view<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         disp: *mut mpi_sys::MPI_Offset,
         etype: *mut mpi_sys::MPI_Datatype,
         filetype: *mut mpi_sys::MPI_Datatype,
         datarep: *mut c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut mpi_sys::MPI_Offset,
+            *mut mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+            *mut c_char,
+        ) -> c_int,
+    {
+        next_f(fh, disp, etype, filetype, datarep)
     }
     #[inline]
-    fn post_file_get_view(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        disp: *mut mpi_sys::MPI_Offset,
-        etype: *mut mpi_sys::MPI_Datatype,
-        filetype: *mut mpi_sys::MPI_Datatype,
-        datarep: *mut c_char,
-    ) {
-    }
-    #[inline]
-    fn pre_file_iread(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_file_iread(
-        &mut self,
-        output: c_int,
+    fn file_iread<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, request)
     }
     #[inline]
-    fn pre_file_iread_all(
-        &mut self,
+    fn file_iread_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, request)
     }
     #[inline]
-    fn post_file_iread_all(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_file_iread_at(
-        &mut self,
+    fn file_iread_at<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, request)
     }
     #[inline]
-    fn post_file_iread_at(
-        &mut self,
-        output: c_int,
+    fn file_iread_at_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, request)
     }
     #[inline]
-    fn pre_file_iread_at_all(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_file_iread_at_all(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_file_iread_shared(
-        &mut self,
+    fn file_iread_shared<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, request)
     }
     #[inline]
-    fn post_file_iread_shared(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_file_iwrite(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_file_iwrite(
-        &mut self,
-        output: c_int,
+    fn file_iwrite<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, request)
     }
     #[inline]
-    fn pre_file_iwrite_all(
-        &mut self,
+    fn file_iwrite_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, request)
     }
     #[inline]
-    fn post_file_iwrite_all(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_file_iwrite_at(
-        &mut self,
+    fn file_iwrite_at<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, request)
     }
     #[inline]
-    fn post_file_iwrite_at(
-        &mut self,
-        output: c_int,
+    fn file_iwrite_at_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, request)
     }
     #[inline]
-    fn pre_file_iwrite_at_all(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_file_iwrite_at_all(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_file_iwrite_shared(
-        &mut self,
+    fn file_iwrite_shared<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, request)
     }
     #[inline]
-    fn post_file_iwrite_shared(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_file_open(
-        &mut self,
+    fn file_open<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         filename: *const c_char,
         amode: c_int,
         info: mpi_sys::MPI_Info,
         fh: *mut mpi_sys::MPI_File,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            *const c_char,
+            c_int,
+            mpi_sys::MPI_Info,
+            *mut mpi_sys::MPI_File,
+        ) -> c_int,
+    {
+        next_f(comm, filename, amode, info, fh)
     }
     #[inline]
-    fn post_file_open(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        filename: *const c_char,
-        amode: c_int,
-        info: mpi_sys::MPI_Info,
-        fh: *mut mpi_sys::MPI_File,
-    ) {
-    }
-    #[inline]
-    fn pre_file_preallocate(&mut self, fh: mpi_sys::MPI_File, size: mpi_sys::MPI_Offset) {}
-    #[inline]
-    fn post_file_preallocate(
-        &mut self,
-        output: c_int,
+    fn file_preallocate<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         size: mpi_sys::MPI_Offset,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Offset) -> c_int,
+    {
+        next_f(fh, size)
     }
     #[inline]
-    fn pre_file_read(
-        &mut self,
+    fn file_read<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn post_file_read(
-        &mut self,
-        output: c_int,
+    fn file_read_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn pre_file_read_all(
-        &mut self,
+    fn file_read_all_begin<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut c_void, c_int, mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(fh, buf, count, datatype)
     }
     #[inline]
-    fn post_file_read_all(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_all_begin(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_file_read_all_begin(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_all_end(
-        &mut self,
+    fn file_read_all_end<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut c_void, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(fh, buf, status)
     }
     #[inline]
-    fn post_file_read_all_end(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_at(
-        &mut self,
+    fn file_read_at<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, status)
     }
     #[inline]
-    fn post_file_read_at(
-        &mut self,
-        output: c_int,
+    fn file_read_at_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, status)
     }
     #[inline]
-    fn pre_file_read_at_all(
-        &mut self,
+    fn file_read_at_all_begin<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype)
     }
     #[inline]
-    fn post_file_read_at_all(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_at_all_begin(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_file_read_at_all_begin(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_at_all_end(
-        &mut self,
+    fn file_read_at_all_end<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut c_void, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(fh, buf, status)
     }
     #[inline]
-    fn post_file_read_at_all_end(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_ordered(
-        &mut self,
+    fn file_read_ordered<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn post_file_read_ordered(
-        &mut self,
-        output: c_int,
+    fn file_read_ordered_begin<F>(
+        &self,
+        next_f: F,
+        fh: mpi_sys::MPI_File,
+        buf: *mut c_void,
+        count: c_int,
+        datatype: mpi_sys::MPI_Datatype,
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut c_void, c_int, mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(fh, buf, count, datatype)
+    }
+    #[inline]
+    fn file_read_ordered_end<F>(
+        &self,
+        next_f: F,
+        fh: mpi_sys::MPI_File,
+        buf: *mut c_void,
+        status: *mut mpi_sys::MPI_Status,
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *mut c_void, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(fh, buf, status)
+    }
+    #[inline]
+    fn file_read_shared<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn pre_file_read_ordered_begin(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_file_read_ordered_begin(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_ordered_end(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn post_file_read_ordered_end(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_read_shared(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn post_file_read_shared(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_seek(&mut self, fh: mpi_sys::MPI_File, offset: mpi_sys::MPI_Offset, whence: c_int) {
-    }
-    #[inline]
-    fn post_file_seek(
-        &mut self,
-        output: c_int,
+    fn file_seek<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         whence: c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Offset, c_int) -> c_int,
+    {
+        next_f(fh, offset, whence)
     }
     #[inline]
-    fn pre_file_seek_shared(
-        &mut self,
+    fn file_seek_shared<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         whence: c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Offset, c_int) -> c_int,
+    {
+        next_f(fh, offset, whence)
     }
     #[inline]
-    fn post_file_seek_shared(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        whence: c_int,
-    ) {
+    fn file_set_atomicity<F>(&self, next_f: F, fh: mpi_sys::MPI_File, flag: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, c_int) -> c_int,
+    {
+        next_f(fh, flag)
     }
     #[inline]
-    fn pre_file_set_atomicity(&mut self, fh: mpi_sys::MPI_File, flag: c_int) {}
-    #[inline]
-    fn post_file_set_atomicity(&mut self, output: c_int, fh: mpi_sys::MPI_File, flag: c_int) {}
-    #[inline]
-    fn pre_file_set_errhandler(
-        &mut self,
+    fn file_set_errhandler<F>(
+        &self,
+        next_f: F,
         file: mpi_sys::MPI_File,
         errhandler: mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(file, errhandler)
     }
     #[inline]
-    fn post_file_set_errhandler(
-        &mut self,
-        output: c_int,
-        file: mpi_sys::MPI_File,
-        errhandler: mpi_sys::MPI_Errhandler,
-    ) {
+    fn file_set_info<F>(&self, next_f: F, fh: mpi_sys::MPI_File, info: mpi_sys::MPI_Info) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(fh, info)
     }
     #[inline]
-    fn pre_file_set_info(&mut self, fh: mpi_sys::MPI_File, info: mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_file_set_info(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        info: mpi_sys::MPI_Info,
-    ) {
+    fn file_set_size<F>(&self, next_f: F, fh: mpi_sys::MPI_File, size: mpi_sys::MPI_Offset) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Offset) -> c_int,
+    {
+        next_f(fh, size)
     }
     #[inline]
-    fn pre_file_set_size(&mut self, fh: mpi_sys::MPI_File, size: mpi_sys::MPI_Offset) {}
-    #[inline]
-    fn post_file_set_size(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        size: mpi_sys::MPI_Offset,
-    ) {
-    }
-    #[inline]
-    fn pre_file_set_view(
-        &mut self,
+    fn file_set_view<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         disp: mpi_sys::MPI_Offset,
         etype: mpi_sys::MPI_Datatype,
         filetype: mpi_sys::MPI_Datatype,
         datarep: *const c_char,
         info: mpi_sys::MPI_Info,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Datatype,
+            *const c_char,
+            mpi_sys::MPI_Info,
+        ) -> c_int,
+    {
+        next_f(fh, disp, etype, filetype, datarep, info)
     }
     #[inline]
-    fn post_file_set_view(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        disp: mpi_sys::MPI_Offset,
-        etype: mpi_sys::MPI_Datatype,
-        filetype: mpi_sys::MPI_Datatype,
-        datarep: *const c_char,
-        info: mpi_sys::MPI_Info,
-    ) {
+    fn file_sync<F>(&self, next_f: F, fh: mpi_sys::MPI_File) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File) -> c_int,
+    {
+        next_f(fh)
     }
     #[inline]
-    fn pre_file_sync(&mut self, fh: mpi_sys::MPI_File) {}
-    #[inline]
-    fn post_file_sync(&mut self, output: c_int, fh: mpi_sys::MPI_File) {}
-    #[inline]
-    fn pre_file_write(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn post_file_write(
-        &mut self,
-        output: c_int,
+    fn file_write<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn pre_file_write_all(
-        &mut self,
+    fn file_write_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn post_file_write_all(
-        &mut self,
-        output: c_int,
+    fn file_write_all_begin<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *const c_void, c_int, mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(fh, buf, count, datatype)
     }
     #[inline]
-    fn pre_file_write_all_begin(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_file_write_all_begin(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_file_write_all_end(
-        &mut self,
+    fn file_write_all_end<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *const c_void, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(fh, buf, status)
     }
     #[inline]
-    fn post_file_write_all_end(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_write_at(
-        &mut self,
+    fn file_write_at<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, status)
     }
     #[inline]
-    fn post_file_write_at(
-        &mut self,
-        output: c_int,
+    fn file_write_at_all<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype, status)
     }
     #[inline]
-    fn pre_file_write_at_all(
-        &mut self,
+    fn file_write_at_all_begin<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            mpi_sys::MPI_Offset,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(fh, offset, buf, count, datatype)
     }
     #[inline]
-    fn post_file_write_at_all(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_write_at_all_begin(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_file_write_at_all_begin(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        offset: mpi_sys::MPI_Offset,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_file_write_at_all_end(
-        &mut self,
+    fn file_write_at_all_end<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *const c_void, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(fh, buf, status)
     }
     #[inline]
-    fn post_file_write_at_all_end(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_write_ordered(
-        &mut self,
+    fn file_write_ordered<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn post_file_write_ordered(
-        &mut self,
-        output: c_int,
+    fn file_write_ordered_begin<F>(
+        &self,
+        next_f: F,
+        fh: mpi_sys::MPI_File,
+        buf: *const c_void,
+        count: c_int,
+        datatype: mpi_sys::MPI_Datatype,
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *const c_void, c_int, mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(fh, buf, count, datatype)
+    }
+    #[inline]
+    fn file_write_ordered_end<F>(
+        &self,
+        next_f: F,
+        fh: mpi_sys::MPI_File,
+        buf: *const c_void,
+        status: *mut mpi_sys::MPI_Status,
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_File, *const c_void, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(fh, buf, status)
+    }
+    #[inline]
+    fn file_write_shared<F>(
+        &self,
+        next_f: F,
         fh: mpi_sys::MPI_File,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_File,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(fh, buf, count, datatype, status)
     }
     #[inline]
-    fn pre_file_write_ordered_begin(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
+    fn finalize<F>(&self, next_f: F) -> c_int
+    where
+        F: FnOnce() -> c_int,
+    {
+        next_f()
     }
     #[inline]
-    fn post_file_write_ordered_begin(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
+    fn finalized<F>(&self, next_f: F, flag: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(flag)
     }
     #[inline]
-    fn pre_file_write_ordered_end(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
+    fn free_mem<F>(&self, next_f: F, base: *mut c_void) -> c_int
+    where
+        F: FnOnce(*mut c_void) -> c_int,
+    {
+        next_f(base)
     }
     #[inline]
-    fn post_file_write_ordered_end(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_file_write_shared(
-        &mut self,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn post_file_write_shared(
-        &mut self,
-        output: c_int,
-        fh: mpi_sys::MPI_File,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_finalize(&mut self) {}
-    #[inline]
-    fn post_finalize(&mut self, output: c_int) {}
-    #[inline]
-    fn pre_finalized(&mut self, flag: *mut c_int) {}
-    #[inline]
-    fn post_finalized(&mut self, output: c_int, flag: *mut c_int) {}
-    #[inline]
-    fn pre_free_mem(&mut self, base: *mut c_void) {}
-    #[inline]
-    fn post_free_mem(&mut self, output: c_int, base: *mut c_void) {}
-    #[inline]
-    fn pre_gather(
-        &mut self,
+    fn gather<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -2157,25 +2153,27 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm,
+        )
     }
     #[inline]
-    fn post_gather(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_gatherv(
-        &mut self,
+    fn gatherv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -2185,26 +2183,28 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root, comm,
+        )
     }
     #[inline]
-    fn post_gatherv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        displs: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_get(
-        &mut self,
+    fn get<F>(
+        &self,
+        next_f: F,
         origin_addr: *mut c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -2213,25 +2213,34 @@ pub trait QmpiLayer {
         target_count: c_int,
         target_datatype: mpi_sys::MPI_Datatype,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            target_rank,
+            target_disp,
+            target_count,
+            target_datatype,
+            win,
+        )
     }
     #[inline]
-    fn post_get(
-        &mut self,
-        output: c_int,
-        origin_addr: *mut c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_count: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        win: mpi_sys::MPI_Win,
-    ) {
-    }
-    #[inline]
-    fn pre_get_accumulate(
-        &mut self,
+    fn get_accumulate<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -2244,429 +2253,388 @@ pub trait QmpiLayer {
         target_datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            result_addr,
+            result_count,
+            result_datatype,
+            target_rank,
+            target_disp,
+            target_count,
+            target_datatype,
+            op,
+            win,
+        )
     }
     #[inline]
-    fn post_get_accumulate(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        result_addr: *mut c_void,
-        result_count: c_int,
-        result_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_count: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        win: mpi_sys::MPI_Win,
-    ) {
-    }
-    #[inline]
-    fn pre_get_address(&mut self, location: *const c_void, address: *mut mpi_sys::MPI_Aint) {}
-    #[inline]
-    fn post_get_address(
-        &mut self,
-        output: c_int,
+    fn get_address<F>(
+        &self,
+        next_f: F,
         location: *const c_void,
         address: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const c_void, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(location, address)
     }
     #[inline]
-    fn pre_get_count(
-        &mut self,
+    fn get_count<F>(
+        &self,
+        next_f: F,
         status: *const mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
         count: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const mpi_sys::MPI_Status, mpi_sys::MPI_Datatype, *mut c_int) -> c_int,
+    {
+        next_f(status, datatype, count)
     }
     #[inline]
-    fn post_get_count(
-        &mut self,
-        output: c_int,
+    fn get_elements<F>(
+        &self,
+        next_f: F,
         status: *const mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
         count: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const mpi_sys::MPI_Status, mpi_sys::MPI_Datatype, *mut c_int) -> c_int,
+    {
+        next_f(status, datatype, count)
     }
     #[inline]
-    fn pre_get_elements(
-        &mut self,
-        status: *const mpi_sys::MPI_Status,
-        datatype: mpi_sys::MPI_Datatype,
-        count: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn post_get_elements(
-        &mut self,
-        output: c_int,
-        status: *const mpi_sys::MPI_Status,
-        datatype: mpi_sys::MPI_Datatype,
-        count: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_get_elements_x(
-        &mut self,
+    fn get_elements_x<F>(
+        &self,
+        next_f: F,
         status: *const mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
         count: *mut mpi_sys::MPI_Count,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const mpi_sys::MPI_Status,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Count,
+        ) -> c_int,
+    {
+        next_f(status, datatype, count)
     }
     #[inline]
-    fn post_get_elements_x(
-        &mut self,
-        output: c_int,
-        status: *const mpi_sys::MPI_Status,
-        datatype: mpi_sys::MPI_Datatype,
-        count: *mut mpi_sys::MPI_Count,
-    ) {
-    }
-    #[inline]
-    fn pre_get_library_version(&mut self, version: *mut c_char, resultlen: *mut c_int) {}
-    #[inline]
-    fn post_get_library_version(
-        &mut self,
-        output: c_int,
+    fn get_library_version<F>(
+        &self,
+        next_f: F,
         version: *mut c_char,
         resultlen: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut c_char, *mut c_int) -> c_int,
+    {
+        next_f(version, resultlen)
     }
     #[inline]
-    fn pre_get_processor_name(&mut self, name: *mut c_char, resultlen: *mut c_int) {}
-    #[inline]
-    fn post_get_processor_name(&mut self, output: c_int, name: *mut c_char, resultlen: *mut c_int) {
+    fn get_processor_name<F>(&self, next_f: F, name: *mut c_char, resultlen: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_char, *mut c_int) -> c_int,
+    {
+        next_f(name, resultlen)
     }
     #[inline]
-    fn pre_get_version(&mut self, version: *mut c_int, subversion: *mut c_int) {}
+    fn get_version<F>(&self, next_f: F, version: *mut c_int, subversion: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int, *mut c_int) -> c_int,
+    {
+        next_f(version, subversion)
+    }
     #[inline]
-    fn post_get_version(&mut self, output: c_int, version: *mut c_int, subversion: *mut c_int) {}
-    #[inline]
-    fn pre_graph_create(
-        &mut self,
+    fn graph_create<F>(
+        &self,
+        next_f: F,
         comm_old: mpi_sys::MPI_Comm,
         nnodes: c_int,
         index: *const c_int,
         edges: *const c_int,
         reorder: c_int,
         comm_graph: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            c_int,
+            *const c_int,
+            *const c_int,
+            c_int,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(comm_old, nnodes, index, edges, reorder, comm_graph)
     }
     #[inline]
-    fn post_graph_create(
-        &mut self,
-        output: c_int,
-        comm_old: mpi_sys::MPI_Comm,
-        nnodes: c_int,
-        index: *const c_int,
-        edges: *const c_int,
-        reorder: c_int,
-        comm_graph: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_graph_get(
-        &mut self,
+    fn graph_get<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         maxindex: c_int,
         maxedges: c_int,
         index: *mut c_int,
         edges: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, c_int, *mut c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, maxindex, maxedges, index, edges)
     }
     #[inline]
-    fn post_graph_get(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        maxindex: c_int,
-        maxedges: c_int,
-        index: *mut c_int,
-        edges: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_graph_map(
-        &mut self,
+    fn graph_map<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         nnodes: c_int,
         index: *const c_int,
         edges: *const c_int,
         newrank: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *const c_int, *const c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, nnodes, index, edges, newrank)
     }
     #[inline]
-    fn post_graph_map(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        nnodes: c_int,
-        index: *const c_int,
-        edges: *const c_int,
-        newrank: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_graph_neighbors(
-        &mut self,
+    fn graph_neighbors<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         rank: c_int,
         maxneighbors: c_int,
         neighbors: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, rank, maxneighbors, neighbors)
     }
     #[inline]
-    fn post_graph_neighbors(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        rank: c_int,
-        maxneighbors: c_int,
-        neighbors: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_graph_neighbors_count(
-        &mut self,
+    fn graph_neighbors_count<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         rank: c_int,
         nneighbors: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, rank, nneighbors)
     }
     #[inline]
-    fn post_graph_neighbors_count(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        rank: c_int,
-        nneighbors: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_graphdims_get(
-        &mut self,
+    fn graphdims_get<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         nnodes: *mut c_int,
         nedges: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int, *mut c_int) -> c_int,
+    {
+        next_f(comm, nnodes, nedges)
     }
     #[inline]
-    fn post_graphdims_get(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        nnodes: *mut c_int,
-        nedges: *mut c_int,
-    ) {
+    fn grequest_complete<F>(&self, next_f: F, request: mpi_sys::MPI_Request) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Request) -> c_int,
+    {
+        next_f(request)
     }
     #[inline]
-    fn pre_grequest_complete(&mut self, request: mpi_sys::MPI_Request) {}
-    #[inline]
-    fn post_grequest_complete(&mut self, output: c_int, request: mpi_sys::MPI_Request) {}
-    #[inline]
-    fn pre_grequest_start(
-        &mut self,
+    fn grequest_start<F>(
+        &self,
+        next_f: F,
         query_fn: *mut mpi_sys::MPI_Grequest_query_function,
         free_fn: *mut mpi_sys::MPI_Grequest_free_function,
         cancel_fn: *mut mpi_sys::MPI_Grequest_cancel_function,
         extra_state: *mut c_void,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut mpi_sys::MPI_Grequest_query_function,
+            *mut mpi_sys::MPI_Grequest_free_function,
+            *mut mpi_sys::MPI_Grequest_cancel_function,
+            *mut c_void,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(query_fn, free_fn, cancel_fn, extra_state, request)
     }
     #[inline]
-    fn post_grequest_start(
-        &mut self,
-        output: c_int,
-        query_fn: *mut mpi_sys::MPI_Grequest_query_function,
-        free_fn: *mut mpi_sys::MPI_Grequest_free_function,
-        cancel_fn: *mut mpi_sys::MPI_Grequest_cancel_function,
-        extra_state: *mut c_void,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_group_compare(
-        &mut self,
+    fn group_compare<F>(
+        &self,
+        next_f: F,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
         result: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, mpi_sys::MPI_Group, *mut c_int) -> c_int,
+    {
+        next_f(group1, group2, result)
     }
     #[inline]
-    fn post_group_compare(
-        &mut self,
-        output: c_int,
-        group1: mpi_sys::MPI_Group,
-        group2: mpi_sys::MPI_Group,
-        result: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_group_difference(
-        &mut self,
+    fn group_difference<F>(
+        &self,
+        next_f: F,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
         newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, mpi_sys::MPI_Group, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group1, group2, newgroup)
     }
     #[inline]
-    fn post_group_difference(
-        &mut self,
-        output: c_int,
-        group1: mpi_sys::MPI_Group,
-        group2: mpi_sys::MPI_Group,
-        newgroup: *mut mpi_sys::MPI_Group,
-    ) {
-    }
-    #[inline]
-    fn pre_group_excl(
-        &mut self,
+    fn group_excl<F>(
+        &self,
+        next_f: F,
         group: mpi_sys::MPI_Group,
         n: c_int,
         ranks: *const c_int,
         newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, c_int, *const c_int, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group, n, ranks, newgroup)
     }
     #[inline]
-    fn post_group_excl(
-        &mut self,
-        output: c_int,
+    fn group_free<F>(&self, next_f: F, group: *mut mpi_sys::MPI_Group) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group)
+    }
+    #[inline]
+    fn group_incl<F>(
+        &self,
+        next_f: F,
         group: mpi_sys::MPI_Group,
         n: c_int,
         ranks: *const c_int,
         newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, c_int, *const c_int, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group, n, ranks, newgroup)
     }
     #[inline]
-    fn pre_group_free(&mut self, group: *mut mpi_sys::MPI_Group) {}
-    #[inline]
-    fn post_group_free(&mut self, output: c_int, group: *mut mpi_sys::MPI_Group) {}
-    #[inline]
-    fn pre_group_incl(
-        &mut self,
-        group: mpi_sys::MPI_Group,
-        n: c_int,
-        ranks: *const c_int,
-        newgroup: *mut mpi_sys::MPI_Group,
-    ) {
-    }
-    #[inline]
-    fn post_group_incl(
-        &mut self,
-        output: c_int,
-        group: mpi_sys::MPI_Group,
-        n: c_int,
-        ranks: *const c_int,
-        newgroup: *mut mpi_sys::MPI_Group,
-    ) {
-    }
-    #[inline]
-    fn pre_group_intersection(
-        &mut self,
+    fn group_intersection<F>(
+        &self,
+        next_f: F,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
         newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, mpi_sys::MPI_Group, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group1, group2, newgroup)
     }
     #[inline]
-    fn post_group_intersection(
-        &mut self,
-        output: c_int,
-        group1: mpi_sys::MPI_Group,
-        group2: mpi_sys::MPI_Group,
-        newgroup: *mut mpi_sys::MPI_Group,
-    ) {
-    }
-    #[inline]
-    fn pre_group_range_excl(
-        &mut self,
+    fn group_range_excl<F>(
+        &self,
+        next_f: F,
         group: mpi_sys::MPI_Group,
         n: c_int,
         ranges: *mut [c_int; 3],
         newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, c_int, *mut [c_int; 3], *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group, n, ranges, newgroup)
     }
     #[inline]
-    fn post_group_range_excl(
-        &mut self,
-        output: c_int,
+    fn group_range_incl<F>(
+        &self,
+        next_f: F,
         group: mpi_sys::MPI_Group,
         n: c_int,
         ranges: *mut [c_int; 3],
         newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, c_int, *mut [c_int; 3], *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group, n, ranges, newgroup)
     }
     #[inline]
-    fn pre_group_range_incl(
-        &mut self,
-        group: mpi_sys::MPI_Group,
-        n: c_int,
-        ranges: *mut [c_int; 3],
-        newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    fn group_rank<F>(&self, next_f: F, group: mpi_sys::MPI_Group, rank: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, *mut c_int) -> c_int,
+    {
+        next_f(group, rank)
     }
     #[inline]
-    fn post_group_range_incl(
-        &mut self,
-        output: c_int,
-        group: mpi_sys::MPI_Group,
-        n: c_int,
-        ranges: *mut [c_int; 3],
-        newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    fn group_size<F>(&self, next_f: F, group: mpi_sys::MPI_Group, size: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, *mut c_int) -> c_int,
+    {
+        next_f(group, size)
     }
     #[inline]
-    fn pre_group_rank(&mut self, group: mpi_sys::MPI_Group, rank: *mut c_int) {}
-    #[inline]
-    fn post_group_rank(&mut self, output: c_int, group: mpi_sys::MPI_Group, rank: *mut c_int) {}
-    #[inline]
-    fn pre_group_size(&mut self, group: mpi_sys::MPI_Group, size: *mut c_int) {}
-    #[inline]
-    fn post_group_size(&mut self, output: c_int, group: mpi_sys::MPI_Group, size: *mut c_int) {}
-    #[inline]
-    fn pre_group_translate_ranks(
-        &mut self,
+    fn group_translate_ranks<F>(
+        &self,
+        next_f: F,
         group1: mpi_sys::MPI_Group,
         n: c_int,
         ranks1: *const c_int,
         group2: mpi_sys::MPI_Group,
         ranks2: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, c_int, *const c_int, mpi_sys::MPI_Group, *mut c_int) -> c_int,
+    {
+        next_f(group1, n, ranks1, group2, ranks2)
     }
     #[inline]
-    fn post_group_translate_ranks(
-        &mut self,
-        output: c_int,
-        group1: mpi_sys::MPI_Group,
-        n: c_int,
-        ranks1: *const c_int,
-        group2: mpi_sys::MPI_Group,
-        ranks2: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_group_union(
-        &mut self,
+    fn group_union<F>(
+        &self,
+        next_f: F,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
         newgroup: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, mpi_sys::MPI_Group, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(group1, group2, newgroup)
     }
     #[inline]
-    fn post_group_union(
-        &mut self,
-        output: c_int,
-        group1: mpi_sys::MPI_Group,
-        group2: mpi_sys::MPI_Group,
-        newgroup: *mut mpi_sys::MPI_Group,
-    ) {
-    }
-    #[inline]
-    fn pre_iallgather(
-        &mut self,
+    fn iallgather<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -2675,25 +2643,27 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
+        )
     }
     #[inline]
-    fn post_iallgather(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_iallgatherv(
-        &mut self,
+    fn iallgatherv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -2703,39 +2673,28 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm, request,
+        )
     }
     #[inline]
-    fn post_iallgatherv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        displs: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_iallreduce(
-        &mut self,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_iallreduce(
-        &mut self,
-        output: c_int,
+    fn iallreduce<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
@@ -2743,11 +2702,24 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, comm, request)
     }
     #[inline]
-    fn pre_ialltoall(
-        &mut self,
+    fn ialltoall<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -2756,25 +2728,27 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
+        )
     }
     #[inline]
-    fn post_ialltoall(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ialltoallv(
-        &mut self,
+    fn ialltoallv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const c_int,
@@ -2785,27 +2759,30 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype, comm,
+            request,
+        )
     }
     #[inline]
-    fn post_ialltoallv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ialltoallw(
-        &mut self,
+    fn ialltoallw<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const c_int,
@@ -2816,60 +2793,65 @@ pub trait QmpiLayer {
         recvtypes: *const mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            *const mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            *const mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes, comm,
+            request,
+        )
     }
     #[inline]
-    fn post_ialltoallw(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const c_int,
-        sendtypes: *const mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const c_int,
-        recvtypes: *const mpi_sys::MPI_Datatype,
+    fn ibarrier<F>(
+        &self,
+        next_f: F,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Request) -> c_int,
+    {
+        next_f(comm, request)
     }
     #[inline]
-    fn pre_ibarrier(&mut self, comm: mpi_sys::MPI_Comm, request: *mut mpi_sys::MPI_Request) {}
-    #[inline]
-    fn post_ibarrier(
-        &mut self,
-        output: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ibcast(
-        &mut self,
+    fn ibcast<F>(
+        &self,
+        next_f: F,
         buffer: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buffer, count, datatype, root, comm, request)
     }
     #[inline]
-    fn post_ibcast(
-        &mut self,
-        output: c_int,
-        buffer: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ibsend(
-        &mut self,
+    fn ibsend<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -2877,24 +2859,24 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn post_ibsend(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_iexscan(
-        &mut self,
+    fn iexscan<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
@@ -2902,39 +2884,24 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, comm, request)
     }
     #[inline]
-    fn post_iexscan(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_igather(
-        &mut self,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_igather(
-        &mut self,
-        output: c_int,
+    fn igather<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -2944,11 +2911,28 @@ pub trait QmpiLayer {
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm, request,
+        )
     }
     #[inline]
-    fn pre_igatherv(
-        &mut self,
+    fn igatherv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -2959,71 +2943,74 @@ pub trait QmpiLayer {
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root, comm,
+            request,
+        )
     }
     #[inline]
-    fn post_igatherv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        displs: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_improbe(
-        &mut self,
+    fn improbe<F>(
+        &self,
+        next_f: F,
         source: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         flag: *mut c_int,
         message: *mut mpi_sys::MPI_Message,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut c_int,
+            *mut mpi_sys::MPI_Message,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(source, tag, comm, flag, message, status)
     }
     #[inline]
-    fn post_improbe(
-        &mut self,
-        output: c_int,
-        source: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        flag: *mut c_int,
-        message: *mut mpi_sys::MPI_Message,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_imrecv(
-        &mut self,
+    fn imrecv<F>(
+        &self,
+        next_f: F,
         buf: *mut c_void,
         count: c_int,
         r#type: mpi_sys::MPI_Datatype,
         message: *mut mpi_sys::MPI_Message,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Message,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, r#type, message, request)
     }
     #[inline]
-    fn post_imrecv(
-        &mut self,
-        output: c_int,
-        buf: *mut c_void,
-        count: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        message: *mut mpi_sys::MPI_Message,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ineighbor_allgather(
-        &mut self,
+    fn ineighbor_allgather<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -3032,25 +3019,27 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
+        )
     }
     #[inline]
-    fn post_ineighbor_allgather(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ineighbor_allgatherv(
-        &mut self,
+    fn ineighbor_allgatherv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -3060,40 +3049,28 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm, request,
+        )
     }
     #[inline]
-    fn post_ineighbor_allgatherv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        displs: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ineighbor_alltoall(
-        &mut self,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_ineighbor_alltoall(
-        &mut self,
-        output: c_int,
+    fn ineighbor_alltoall<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -3102,11 +3079,27 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
+        )
     }
     #[inline]
-    fn pre_ineighbor_alltoallv(
-        &mut self,
+    fn ineighbor_alltoallv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const c_int,
@@ -3117,27 +3110,30 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype, comm,
+            request,
+        )
     }
     #[inline]
-    fn post_ineighbor_alltoallv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ineighbor_alltoallw(
-        &mut self,
+    fn ineighbor_alltoallw<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const mpi_sys::MPI_Aint,
@@ -3148,207 +3144,220 @@ pub trait QmpiLayer {
         recvtypes: *const mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const mpi_sys::MPI_Aint,
+            *const mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const mpi_sys::MPI_Aint,
+            *const mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes, comm,
+            request,
+        )
     }
     #[inline]
-    fn post_ineighbor_alltoallw(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const mpi_sys::MPI_Aint,
-        sendtypes: *const mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const mpi_sys::MPI_Aint,
-        recvtypes: *const mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
+    fn info_create<F>(&self, next_f: F, info: *mut mpi_sys::MPI_Info) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(info)
     }
     #[inline]
-    fn pre_info_create(&mut self, info: *mut mpi_sys::MPI_Info) {}
+    fn info_delete<F>(&self, next_f: F, info: mpi_sys::MPI_Info, key: *const c_char) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, *const c_char) -> c_int,
+    {
+        next_f(info, key)
+    }
     #[inline]
-    fn post_info_create(&mut self, output: c_int, info: *mut mpi_sys::MPI_Info) {}
-    #[inline]
-    fn pre_info_delete(&mut self, info: mpi_sys::MPI_Info, key: *const c_char) {}
-    #[inline]
-    fn post_info_delete(&mut self, output: c_int, info: mpi_sys::MPI_Info, key: *const c_char) {}
-    #[inline]
-    fn pre_info_dup(&mut self, info: mpi_sys::MPI_Info, newinfo: *mut mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_info_dup(
-        &mut self,
-        output: c_int,
+    fn info_dup<F>(
+        &self,
+        next_f: F,
         info: mpi_sys::MPI_Info,
         newinfo: *mut mpi_sys::MPI_Info,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, *mut mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(info, newinfo)
     }
     #[inline]
-    fn pre_info_free(&mut self, info: *mut mpi_sys::MPI_Info) {}
+    fn info_free<F>(&self, next_f: F, info: *mut mpi_sys::MPI_Info) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(info)
+    }
     #[inline]
-    fn post_info_free(&mut self, output: c_int, info: *mut mpi_sys::MPI_Info) {}
-    #[inline]
-    fn pre_info_get(
-        &mut self,
+    fn info_get<F>(
+        &self,
+        next_f: F,
         info: mpi_sys::MPI_Info,
         key: *const c_char,
         valuelen: c_int,
         value: *mut c_char,
         flag: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, *const c_char, c_int, *mut c_char, *mut c_int) -> c_int,
+    {
+        next_f(info, key, valuelen, value, flag)
     }
     #[inline]
-    fn post_info_get(
-        &mut self,
-        output: c_int,
-        info: mpi_sys::MPI_Info,
-        key: *const c_char,
-        valuelen: c_int,
-        value: *mut c_char,
-        flag: *mut c_int,
-    ) {
+    fn info_get_nkeys<F>(&self, next_f: F, info: mpi_sys::MPI_Info, nkeys: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, *mut c_int) -> c_int,
+    {
+        next_f(info, nkeys)
     }
     #[inline]
-    fn pre_info_get_nkeys(&mut self, info: mpi_sys::MPI_Info, nkeys: *mut c_int) {}
-    #[inline]
-    fn post_info_get_nkeys(&mut self, output: c_int, info: mpi_sys::MPI_Info, nkeys: *mut c_int) {}
-    #[inline]
-    fn pre_info_get_nthkey(&mut self, info: mpi_sys::MPI_Info, n: c_int, key: *mut c_char) {}
-    #[inline]
-    fn post_info_get_nthkey(
-        &mut self,
-        output: c_int,
+    fn info_get_nthkey<F>(
+        &self,
+        next_f: F,
         info: mpi_sys::MPI_Info,
         n: c_int,
         key: *mut c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, c_int, *mut c_char) -> c_int,
+    {
+        next_f(info, n, key)
     }
     #[inline]
-    fn pre_info_get_valuelen(
-        &mut self,
+    fn info_get_valuelen<F>(
+        &self,
+        next_f: F,
         info: mpi_sys::MPI_Info,
         key: *const c_char,
         valuelen: *mut c_int,
         flag: *mut c_int,
         i: c_int,
         v: *mut qmpi_sys::vector,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Info,
+            *const c_char,
+            *mut c_int,
+            *mut c_int,
+            c_int,
+            *mut qmpi_sys::vector,
+        ) -> c_int,
+    {
+        next_f(info, key, valuelen, flag, i, v)
     }
     #[inline]
-    fn post_info_get_valuelen(
-        &mut self,
-        output: c_int,
-        info: mpi_sys::MPI_Info,
-        key: *const c_char,
-        valuelen: *mut c_int,
-        flag: *mut c_int,
-        i: c_int,
-        v: *mut qmpi_sys::vector,
-    ) {
-    }
-    #[inline]
-    fn pre_info_set(&mut self, info: mpi_sys::MPI_Info, key: *const c_char, value: *const c_char) {}
-    #[inline]
-    fn post_info_set(
-        &mut self,
-        output: c_int,
+    fn info_set<F>(
+        &self,
+        next_f: F,
         info: mpi_sys::MPI_Info,
         key: *const c_char,
         value: *const c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, *const c_char, *const c_char) -> c_int,
+    {
+        next_f(info, key, value)
     }
     #[inline]
-    fn pre_init(&mut self, argc: *mut c_int, argv: *mut *mut *mut c_char) {}
+    fn init<F>(&self, next_f: F, argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_int
+    where
+        F: FnOnce(*mut c_int, *mut *mut *mut c_char) -> c_int,
+    {
+        next_f(argc, argv)
+    }
     #[inline]
-    fn post_init(&mut self, output: c_int, argc: *mut c_int, argv: *mut *mut *mut c_char) {}
-    #[inline]
-    fn pre_init_thread(
-        &mut self,
+    fn init_thread<F>(
+        &self,
+        next_f: F,
         argc: *mut c_int,
         argv: *mut *mut *mut c_char,
         required: c_int,
         provided: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut c_int, *mut *mut *mut c_char, c_int, *mut c_int) -> c_int,
+    {
+        next_f(argc, argv, required, provided)
     }
     #[inline]
-    fn post_init_thread(
-        &mut self,
-        output: c_int,
-        argc: *mut c_int,
-        argv: *mut *mut *mut c_char,
-        required: c_int,
-        provided: *mut c_int,
-    ) {
+    fn initialized<F>(&self, next_f: F, flag: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(flag)
     }
     #[inline]
-    fn pre_initialized(&mut self, flag: *mut c_int) {}
-    #[inline]
-    fn post_initialized(&mut self, output: c_int, flag: *mut c_int) {}
-    #[inline]
-    fn pre_intercomm_create(
-        &mut self,
+    fn intercomm_create<F>(
+        &self,
+        next_f: F,
         local_comm: mpi_sys::MPI_Comm,
         local_leader: c_int,
         bridge_comm: mpi_sys::MPI_Comm,
         remote_leader: c_int,
         tag: c_int,
         newintercomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Comm,
+            c_int,
+            mpi_sys::MPI_Comm,
+            c_int,
+            c_int,
+            *mut mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            local_comm,
+            local_leader,
+            bridge_comm,
+            remote_leader,
+            tag,
+            newintercomm,
+        )
     }
     #[inline]
-    fn post_intercomm_create(
-        &mut self,
-        output: c_int,
-        local_comm: mpi_sys::MPI_Comm,
-        local_leader: c_int,
-        bridge_comm: mpi_sys::MPI_Comm,
-        remote_leader: c_int,
-        tag: c_int,
-        newintercomm: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_intercomm_merge(
-        &mut self,
+    fn intercomm_merge<F>(
+        &self,
+        next_f: F,
         intercomm: mpi_sys::MPI_Comm,
         high: c_int,
         newintercomm: *mut mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, c_int, *mut mpi_sys::MPI_Comm) -> c_int,
+    {
+        next_f(intercomm, high, newintercomm)
     }
     #[inline]
-    fn post_intercomm_merge(
-        &mut self,
-        output: c_int,
-        intercomm: mpi_sys::MPI_Comm,
-        high: c_int,
-        newintercomm: *mut mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_iprobe(
-        &mut self,
+    fn iprobe<F>(
+        &self,
+        next_f: F,
         source: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         flag: *mut c_int,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, c_int, mpi_sys::MPI_Comm, *mut c_int, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(source, tag, comm, flag, status)
     }
     #[inline]
-    fn post_iprobe(
-        &mut self,
-        output: c_int,
-        source: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        flag: *mut c_int,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_irecv(
-        &mut self,
+    fn irecv<F>(
+        &self,
+        next_f: F,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -3356,24 +3365,24 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, source, tag, comm, request)
     }
     #[inline]
-    fn post_irecv(
-        &mut self,
-        output: c_int,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        source: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ireduce(
-        &mut self,
+    fn ireduce<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
@@ -3382,38 +3391,25 @@ pub trait QmpiLayer {
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, root, comm, request)
     }
     #[inline]
-    fn post_ireduce(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_ireduce_scatter(
-        &mut self,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_ireduce_scatter(
-        &mut self,
-        output: c_int,
+    fn ireduce_scatter<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         recvcounts: *const c_int,
@@ -3421,11 +3417,24 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, recvcounts, datatype, op, comm, request)
     }
     #[inline]
-    fn pre_ireduce_scatter_block(
-        &mut self,
+    fn ireduce_scatter_block<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         recvcount: c_int,
@@ -3433,24 +3442,24 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, recvcount, datatype, op, comm, request)
     }
     #[inline]
-    fn post_ireduce_scatter_block(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_irsend(
-        &mut self,
+    fn irsend<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -3458,28 +3467,31 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn post_irsend(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
+    fn is_thread_main<F>(&self, next_f: F, flag: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(flag)
     }
     #[inline]
-    fn pre_is_thread_main(&mut self, flag: *mut c_int) {}
-    #[inline]
-    fn post_is_thread_main(&mut self, output: c_int, flag: *mut c_int) {}
-    #[inline]
-    fn pre_iscan(
-        &mut self,
+    fn iscan<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
@@ -3487,24 +3499,24 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, comm, request)
     }
     #[inline]
-    fn post_iscan(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_iscatter(
-        &mut self,
+    fn iscatter<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -3514,26 +3526,28 @@ pub trait QmpiLayer {
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm, request,
+        )
     }
     #[inline]
-    fn post_iscatter(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_iscatterv(
-        &mut self,
+    fn iscatterv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         displs: *const c_int,
@@ -3544,27 +3558,30 @@ pub trait QmpiLayer {
         root: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, comm,
+            request,
+        )
     }
     #[inline]
-    fn post_iscatterv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        displs: *const c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_isend(
-        &mut self,
+    fn isend<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -3572,12 +3589,24 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn post_isend(
-        &mut self,
-        output: c_int,
+    fn issend<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -3585,118 +3614,105 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn pre_issend(
-        &mut self,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_issend(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_keyval_create(
-        &mut self,
+    fn keyval_create<F>(
+        &self,
+        next_f: F,
         copy_fn: *mut mpi_sys::MPI_Copy_function,
         delete_fn: *mut mpi_sys::MPI_Delete_function,
         keyval: *mut c_int,
         extra_state: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut mpi_sys::MPI_Copy_function,
+            *mut mpi_sys::MPI_Delete_function,
+            *mut c_int,
+            *mut c_void,
+        ) -> c_int,
+    {
+        next_f(copy_fn, delete_fn, keyval, extra_state)
     }
     #[inline]
-    fn post_keyval_create(
-        &mut self,
-        output: c_int,
-        copy_fn: *mut mpi_sys::MPI_Copy_function,
-        delete_fn: *mut mpi_sys::MPI_Delete_function,
-        keyval: *mut c_int,
-        extra_state: *mut c_void,
-    ) {
+    fn keyval_free<F>(&self, next_f: F, keyval: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(keyval)
     }
     #[inline]
-    fn pre_keyval_free(&mut self, keyval: *mut c_int) {}
-    #[inline]
-    fn post_keyval_free(&mut self, output: c_int, keyval: *mut c_int) {}
-    #[inline]
-    fn pre_lookup_name(
-        &mut self,
+    fn lookup_name<F>(
+        &self,
+        next_f: F,
         service_name: *const c_char,
         info: mpi_sys::MPI_Info,
         port_name: *mut c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const c_char, mpi_sys::MPI_Info, *mut c_char) -> c_int,
+    {
+        next_f(service_name, info, port_name)
     }
     #[inline]
-    fn post_lookup_name(
-        &mut self,
-        output: c_int,
-        service_name: *const c_char,
-        info: mpi_sys::MPI_Info,
-        port_name: *mut c_char,
-    ) {
-    }
-    #[inline]
-    fn pre_mprobe(
-        &mut self,
+    fn mprobe<F>(
+        &self,
+        next_f: F,
         source: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         message: *mut mpi_sys::MPI_Message,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Message,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(source, tag, comm, message, status)
     }
     #[inline]
-    fn post_mprobe(
-        &mut self,
-        output: c_int,
-        source: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        message: *mut mpi_sys::MPI_Message,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_mrecv(
-        &mut self,
+    fn mrecv<F>(
+        &self,
+        next_f: F,
         buf: *mut c_void,
         count: c_int,
         r#type: mpi_sys::MPI_Datatype,
         message: *mut mpi_sys::MPI_Message,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Message,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(buf, count, r#type, message, status)
     }
     #[inline]
-    fn post_mrecv(
-        &mut self,
-        output: c_int,
-        buf: *mut c_void,
-        count: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        message: *mut mpi_sys::MPI_Message,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_neighbor_allgather(
-        &mut self,
+    fn neighbor_allgather<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -3704,24 +3720,26 @@ pub trait QmpiLayer {
         recvcount: c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
+        )
     }
     #[inline]
-    fn post_neighbor_allgather(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_neighbor_allgatherv(
-        &mut self,
+    fn neighbor_allgatherv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -3730,38 +3748,27 @@ pub trait QmpiLayer {
         displs: *const c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm,
+        )
     }
     #[inline]
-    fn post_neighbor_allgatherv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        displs: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_neighbor_alltoall(
-        &mut self,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn post_neighbor_alltoall(
-        &mut self,
-        output: c_int,
+    fn neighbor_alltoall<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -3769,11 +3776,26 @@ pub trait QmpiLayer {
         recvcount: c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
+        )
     }
     #[inline]
-    fn pre_neighbor_alltoallv(
-        &mut self,
+    fn neighbor_alltoallv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const c_int,
@@ -3783,41 +3805,28 @@ pub trait QmpiLayer {
         rdispls: *const c_int,
         recvtype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype, comm,
+        )
     }
     #[inline]
-    fn post_neighbor_alltoallv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_neighbor_alltoallw(
-        &mut self,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        sdispls: *const mpi_sys::MPI_Aint,
-        sendtypes: *const mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        rdispls: *const mpi_sys::MPI_Aint,
-        recvtypes: *const mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn post_neighbor_alltoallw(
-        &mut self,
-        output: c_int,
+    fn neighbor_alltoallw<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         sdispls: *const mpi_sys::MPI_Aint,
@@ -3827,40 +3836,62 @@ pub trait QmpiLayer {
         rdispls: *const mpi_sys::MPI_Aint,
         recvtypes: *const mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const mpi_sys::MPI_Aint,
+            *const mpi_sys::MPI_Datatype,
+            *mut c_void,
+            *const c_int,
+            *const mpi_sys::MPI_Aint,
+            *const mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes, comm,
+        )
     }
     #[inline]
-    fn pre_op_commutative(&mut self, op: mpi_sys::MPI_Op, commute: *mut c_int) {}
+    fn op_commutative<F>(&self, next_f: F, op: mpi_sys::MPI_Op, commute: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Op, *mut c_int) -> c_int,
+    {
+        next_f(op, commute)
+    }
     #[inline]
-    fn post_op_commutative(&mut self, output: c_int, op: mpi_sys::MPI_Op, commute: *mut c_int) {}
-    #[inline]
-    fn pre_op_create(
-        &mut self,
+    fn op_create<F>(
+        &self,
+        next_f: F,
         function: *mut mpi_sys::MPI_User_function,
         commute: c_int,
         op: *mut mpi_sys::MPI_Op,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_User_function, c_int, *mut mpi_sys::MPI_Op) -> c_int,
+    {
+        next_f(function, commute, op)
     }
     #[inline]
-    fn post_op_create(
-        &mut self,
-        output: c_int,
-        function: *mut mpi_sys::MPI_User_function,
-        commute: c_int,
-        op: *mut mpi_sys::MPI_Op,
-    ) {
+    fn op_free<F>(&self, next_f: F, op: *mut mpi_sys::MPI_Op) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Op) -> c_int,
+    {
+        next_f(op)
     }
     #[inline]
-    fn pre_op_free(&mut self, op: *mut mpi_sys::MPI_Op) {}
+    fn open_port<F>(&self, next_f: F, info: mpi_sys::MPI_Info, port_name: *mut c_char) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, *mut c_char) -> c_int,
+    {
+        next_f(info, port_name)
+    }
     #[inline]
-    fn post_op_free(&mut self, output: c_int, op: *mut mpi_sys::MPI_Op) {}
-    #[inline]
-    fn pre_open_port(&mut self, info: mpi_sys::MPI_Info, port_name: *mut c_char) {}
-    #[inline]
-    fn post_open_port(&mut self, output: c_int, info: mpi_sys::MPI_Info, port_name: *mut c_char) {}
-    #[inline]
-    fn pre_pack(
-        &mut self,
+    fn pack<F>(
+        &self,
+        next_f: F,
         inbuf: *const c_void,
         incount: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -3868,24 +3899,24 @@ pub trait QmpiLayer {
         outsize: c_int,
         position: *mut c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            *mut c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(inbuf, incount, datatype, outbuf, outsize, position, comm)
     }
     #[inline]
-    fn post_pack(
-        &mut self,
-        output: c_int,
-        inbuf: *const c_void,
-        incount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        outbuf: *mut c_void,
-        outsize: c_int,
-        position: *mut c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_pack_external(
-        &mut self,
+    fn pack_external<F>(
+        &self,
+        next_f: F,
         datarep: *const c_char,
         inbuf: *const c_void,
         incount: c_int,
@@ -3893,102 +3924,86 @@ pub trait QmpiLayer {
         outbuf: *mut c_void,
         outsize: mpi_sys::MPI_Aint,
         position: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_char,
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            mpi_sys::MPI_Aint,
+            *mut mpi_sys::MPI_Aint,
+        ) -> c_int,
+    {
+        next_f(datarep, inbuf, incount, datatype, outbuf, outsize, position)
     }
     #[inline]
-    fn post_pack_external(
-        &mut self,
-        output: c_int,
-        datarep: *const c_char,
-        inbuf: *const c_void,
-        incount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        outbuf: *mut c_void,
-        outsize: mpi_sys::MPI_Aint,
-        position: *mut mpi_sys::MPI_Aint,
-    ) {
-    }
-    #[inline]
-    fn pre_pack_external_size(
-        &mut self,
-        datarep: *const c_char,
-        incount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        size: *mut mpi_sys::MPI_Aint,
-    ) {
-    }
-    #[inline]
-    fn post_pack_external_size(
-        &mut self,
-        output: c_int,
+    fn pack_external_size<F>(
+        &self,
+        next_f: F,
         datarep: *const c_char,
         incount: c_int,
         datatype: mpi_sys::MPI_Datatype,
         size: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const c_char, c_int, mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(datarep, incount, datatype, size)
     }
     #[inline]
-    fn pre_pack_size(
-        &mut self,
+    fn pack_size<F>(
+        &self,
+        next_f: F,
         incount: c_int,
         datatype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
         size: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, mpi_sys::MPI_Datatype, mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(incount, datatype, comm, size)
     }
     #[inline]
-    fn post_pack_size(
-        &mut self,
-        output: c_int,
-        incount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-        size: *mut c_int,
-    ) {
+    fn pcontrol<F>(&self, next_f: F, level: c_int) -> c_int
+    where
+        F: FnOnce(c_int) -> c_int,
+    {
+        next_f(level)
     }
     #[inline]
-    fn pre_pcontrol(&mut self, level: c_int) {}
-    #[inline]
-    fn post_pcontrol(&mut self, output: c_int, level: c_int) {}
-    #[inline]
-    fn pre_probe(
-        &mut self,
+    fn probe<F>(
+        &self,
+        next_f: F,
         source: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, c_int, mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(source, tag, comm, status)
     }
     #[inline]
-    fn post_probe(
-        &mut self,
-        output: c_int,
-        source: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_publish_name(
-        &mut self,
+    fn publish_name<F>(
+        &self,
+        next_f: F,
         service_name: *const c_char,
         info: mpi_sys::MPI_Info,
         port_name: *const c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const c_char, mpi_sys::MPI_Info, *const c_char) -> c_int,
+    {
+        next_f(service_name, info, port_name)
     }
     #[inline]
-    fn post_publish_name(
-        &mut self,
-        output: c_int,
-        service_name: *const c_char,
-        info: mpi_sys::MPI_Info,
-        port_name: *const c_char,
-    ) {
-    }
-    #[inline]
-    fn pre_put(
-        &mut self,
+    fn put<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -3997,29 +4012,41 @@ pub trait QmpiLayer {
         target_count: c_int,
         target_datatype: mpi_sys::MPI_Datatype,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            target_rank,
+            target_disp,
+            target_count,
+            target_datatype,
+            win,
+        )
     }
     #[inline]
-    fn post_put(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_count: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        win: mpi_sys::MPI_Win,
-    ) {
+    fn query_thread<F>(&self, next_f: F, provided: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(provided)
     }
     #[inline]
-    fn pre_query_thread(&mut self, provided: *mut c_int) {}
-    #[inline]
-    fn post_query_thread(&mut self, output: c_int, provided: *mut c_int) {}
-    #[inline]
-    fn pre_raccumulate(
-        &mut self,
+    fn raccumulate<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -4030,27 +4057,38 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         win: mpi_sys::MPI_Win,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Win,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            target_rank,
+            target_disp,
+            target_count,
+            target_datatype,
+            op,
+            win,
+            request,
+        )
     }
     #[inline]
-    fn post_raccumulate(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_count: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        win: mpi_sys::MPI_Win,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_recv(
-        &mut self,
+    fn recv<F>(
+        &self,
+        next_f: F,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -4058,37 +4096,24 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, source, tag, comm, status)
     }
     #[inline]
-    fn post_recv(
-        &mut self,
-        output: c_int,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        source: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_recv_init(
-        &mut self,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        source: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_recv_init(
-        &mut self,
-        output: c_int,
+    fn recv_init<F>(
+        &self,
+        next_f: F,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -4096,11 +4121,24 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, source, tag, comm, request)
     }
     #[inline]
-    fn pre_reduce(
-        &mut self,
+    fn reduce<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
@@ -4108,133 +4146,138 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, root, comm)
     }
     #[inline]
-    fn post_reduce(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_reduce_local(
-        &mut self,
+    fn reduce_local<F>(
+        &self,
+        next_f: F,
         inbuf: *const c_void,
         inoutbuf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+        ) -> c_int,
+    {
+        next_f(inbuf, inoutbuf, count, datatype, op)
     }
     #[inline]
-    fn post_reduce_local(
-        &mut self,
-        output: c_int,
-        inbuf: *const c_void,
-        inoutbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-    ) {
-    }
-    #[inline]
-    fn pre_reduce_scatter(
-        &mut self,
+    fn reduce_scatter<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         recvcounts: *const c_int,
         datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, recvcounts, datatype, op, comm)
     }
     #[inline]
-    fn post_reduce_scatter(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        recvcounts: *const c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_reduce_scatter_block(
-        &mut self,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn post_reduce_scatter_block(
-        &mut self,
-        output: c_int,
+    fn reduce_scatter_block<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         recvcount: c_int,
         datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, recvcount, datatype, op, comm)
     }
     #[inline]
-    fn pre_register_datarep(
-        &mut self,
+    fn register_datarep<F>(
+        &self,
+        next_f: F,
         datarep: *const c_char,
         read_conversion_fn: *mut mpi_sys::MPI_Datarep_conversion_function,
         write_conversion_fn: *mut mpi_sys::MPI_Datarep_conversion_function,
         dtype_file_extent_fn: *mut mpi_sys::MPI_Datarep_extent_function,
         extra_state: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_char,
+            *mut mpi_sys::MPI_Datarep_conversion_function,
+            *mut mpi_sys::MPI_Datarep_conversion_function,
+            *mut mpi_sys::MPI_Datarep_extent_function,
+            *mut c_void,
+        ) -> c_int,
+    {
+        next_f(
+            datarep,
+            read_conversion_fn,
+            write_conversion_fn,
+            dtype_file_extent_fn,
+            extra_state,
+        )
     }
     #[inline]
-    fn post_register_datarep(
-        &mut self,
-        output: c_int,
-        datarep: *const c_char,
-        read_conversion_fn: *mut mpi_sys::MPI_Datarep_conversion_function,
-        write_conversion_fn: *mut mpi_sys::MPI_Datarep_conversion_function,
-        dtype_file_extent_fn: *mut mpi_sys::MPI_Datarep_extent_function,
-        extra_state: *mut c_void,
-    ) {
+    fn request_free<F>(&self, next_f: F, request: *mut mpi_sys::MPI_Request) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Request) -> c_int,
+    {
+        next_f(request)
     }
     #[inline]
-    fn pre_request_free(&mut self, request: *mut mpi_sys::MPI_Request) {}
-    #[inline]
-    fn post_request_free(&mut self, output: c_int, request: *mut mpi_sys::MPI_Request) {}
-    #[inline]
-    fn pre_request_get_status(
-        &mut self,
+    fn request_get_status<F>(
+        &self,
+        next_f: F,
         request: mpi_sys::MPI_Request,
         flag: *mut c_int,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Request, *mut c_int, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(request, flag, status)
     }
     #[inline]
-    fn post_request_get_status(
-        &mut self,
-        output: c_int,
-        request: mpi_sys::MPI_Request,
-        flag: *mut c_int,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_rget(
-        &mut self,
+    fn rget<F>(
+        &self,
+        next_f: F,
         origin_addr: *mut c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -4244,26 +4287,36 @@ pub trait QmpiLayer {
         target_datatype: mpi_sys::MPI_Datatype,
         win: mpi_sys::MPI_Win,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Win,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            target_rank,
+            target_disp,
+            target_count,
+            target_datatype,
+            win,
+            request,
+        )
     }
     #[inline]
-    fn post_rget(
-        &mut self,
-        output: c_int,
-        origin_addr: *mut c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_count: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        win: mpi_sys::MPI_Win,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_rget_accumulate(
-        &mut self,
+    fn rget_accumulate<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -4277,30 +4330,44 @@ pub trait QmpiLayer {
         op: mpi_sys::MPI_Op,
         win: mpi_sys::MPI_Win,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Win,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            result_addr,
+            result_count,
+            result_datatype,
+            target_rank,
+            target_disp,
+            target_count,
+            target_datatype,
+            op,
+            win,
+            request,
+        )
     }
     #[inline]
-    fn post_rget_accumulate(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        result_addr: *mut c_void,
-        result_count: c_int,
-        result_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_count: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        win: mpi_sys::MPI_Win,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_rput(
-        &mut self,
+    fn rput<F>(
+        &self,
+        next_f: F,
         origin_addr: *const c_void,
         origin_count: c_int,
         origin_datatype: mpi_sys::MPI_Datatype,
@@ -4310,49 +4377,59 @@ pub trait QmpiLayer {
         target_datatype: mpi_sys::MPI_Datatype,
         win: mpi_sys::MPI_Win,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Win,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(
+            origin_addr,
+            origin_count,
+            origin_datatype,
+            target_rank,
+            target_disp,
+            target_cout,
+            target_datatype,
+            win,
+            request,
+        )
     }
     #[inline]
-    fn post_rput(
-        &mut self,
-        output: c_int,
-        origin_addr: *const c_void,
-        origin_count: c_int,
-        origin_datatype: mpi_sys::MPI_Datatype,
-        target_rank: c_int,
-        target_disp: mpi_sys::MPI_Aint,
-        target_cout: c_int,
-        target_datatype: mpi_sys::MPI_Datatype,
-        win: mpi_sys::MPI_Win,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_rsend(
-        &mut self,
+    fn rsend<F>(
+        &self,
+        next_f: F,
         ibuf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         dest: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(ibuf, count, datatype, dest, tag, comm)
     }
     #[inline]
-    fn post_rsend(
-        &mut self,
-        output: c_int,
-        ibuf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_rsend_init(
-        &mut self,
+    fn rsend_init<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -4360,47 +4437,47 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn post_rsend_init(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn pre_scan(
-        &mut self,
+    fn scan<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         recvbuf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         op: mpi_sys::MPI_Op,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Op,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(sendbuf, recvbuf, count, datatype, op, comm)
     }
     #[inline]
-    fn post_scan(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        recvbuf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        op: mpi_sys::MPI_Op,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_scatter(
-        &mut self,
+    fn scatter<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -4409,25 +4486,27 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm,
+        )
     }
     #[inline]
-    fn post_scatter(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_scatterv(
-        &mut self,
+    fn scatterv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcounts: *const c_int,
         displs: *const c_int,
@@ -4437,62 +4516,51 @@ pub trait QmpiLayer {
         recvtype: mpi_sys::MPI_Datatype,
         root: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, comm,
+        )
     }
     #[inline]
-    fn post_scatterv(
-        &mut self,
-        output: c_int,
-        sendbuf: *const c_void,
-        sendcounts: *const c_int,
-        displs: *const c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        root: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_send(
-        &mut self,
+    fn send<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         dest: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm)
     }
     #[inline]
-    fn post_send(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_send_init(
-        &mut self,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_send_init(
-        &mut self,
-        output: c_int,
+    fn send_init<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -4500,29 +4568,24 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn pre_sendrecv(
-        &mut self,
-        sendbuf: *const c_void,
-        sendcount: c_int,
-        sendtype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        sendtag: c_int,
-        recvbuf: *mut c_void,
-        recvcount: c_int,
-        recvtype: mpi_sys::MPI_Datatype,
-        source: c_int,
-        recvtag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn post_sendrecv(
-        &mut self,
-        output: c_int,
+    fn sendrecv<F>(
+        &self,
+        next_f: F,
         sendbuf: *const c_void,
         sendcount: c_int,
         sendtype: mpi_sys::MPI_Datatype,
@@ -4535,11 +4598,32 @@ pub trait QmpiLayer {
         recvtag: c_int,
         comm: mpi_sys::MPI_Comm,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(
+            sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source,
+            recvtag, comm, status,
+        )
     }
     #[inline]
-    fn pre_sendrecv_replace(
-        &mut self,
+    fn sendrecv_replace<F>(
+        &self,
+        next_f: F,
         buf: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -4549,62 +4633,51 @@ pub trait QmpiLayer {
         recvtag: c_int,
         comm: mpi_sys::MPI_Comm,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(
+            buf, count, datatype, dest, sendtag, source, recvtag, comm, status,
+        )
     }
     #[inline]
-    fn post_sendrecv_replace(
-        &mut self,
-        output: c_int,
-        buf: *mut c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        sendtag: c_int,
-        source: c_int,
-        recvtag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_ssend(
-        &mut self,
+    fn ssend<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
         dest: c_int,
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm)
     }
     #[inline]
-    fn post_ssend(
-        &mut self,
-        output: c_int,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_ssend_init(
-        &mut self,
-        buf: *const c_void,
-        count: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        dest: c_int,
-        tag: c_int,
-        comm: mpi_sys::MPI_Comm,
-        request: *mut mpi_sys::MPI_Request,
-    ) {
-    }
-    #[inline]
-    fn post_ssend_init(
-        &mut self,
-        output: c_int,
+    fn ssend_init<F>(
+        &self,
+        next_f: F,
         buf: *const c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -4612,182 +4685,195 @@ pub trait QmpiLayer {
         tag: c_int,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Request,
+        ) -> c_int,
+    {
+        next_f(buf, count, datatype, dest, tag, comm, request)
     }
     #[inline]
-    fn pre_start(&mut self, request: *mut mpi_sys::MPI_Request) {}
+    fn start<F>(&self, next_f: F, request: *mut mpi_sys::MPI_Request) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Request) -> c_int,
+    {
+        next_f(request)
+    }
     #[inline]
-    fn post_start(&mut self, output: c_int, request: *mut mpi_sys::MPI_Request) {}
-    #[inline]
-    fn pre_startall(&mut self, count: c_int, array_of_requests: *mut mpi_sys::MPI_Request) {}
-    #[inline]
-    fn post_startall(
-        &mut self,
-        output: c_int,
+    fn startall<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, *mut mpi_sys::MPI_Request) -> c_int,
+    {
+        next_f(count, array_of_requests)
     }
     #[inline]
-    fn pre_status_set_cancelled(&mut self, status: *mut mpi_sys::MPI_Status, flag: c_int) {}
-    #[inline]
-    fn post_status_set_cancelled(
-        &mut self,
-        output: c_int,
+    fn status_set_cancelled<F>(
+        &self,
+        next_f: F,
         status: *mut mpi_sys::MPI_Status,
         flag: c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Status, c_int) -> c_int,
+    {
+        next_f(status, flag)
     }
     #[inline]
-    fn pre_status_set_elements(
-        &mut self,
+    fn status_set_elements<F>(
+        &self,
+        next_f: F,
         status: *mut mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
         count: c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Status, mpi_sys::MPI_Datatype, c_int) -> c_int,
+    {
+        next_f(status, datatype, count)
     }
     #[inline]
-    fn post_status_set_elements(
-        &mut self,
-        output: c_int,
-        status: *mut mpi_sys::MPI_Status,
-        datatype: mpi_sys::MPI_Datatype,
-        count: c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_status_set_elements_x(
-        &mut self,
+    fn status_set_elements_x<F>(
+        &self,
+        next_f: F,
         status: *mut mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
         count: mpi_sys::MPI_Count,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Status, mpi_sys::MPI_Datatype, mpi_sys::MPI_Count) -> c_int,
+    {
+        next_f(status, datatype, count)
     }
     #[inline]
-    fn post_status_set_elements_x(
-        &mut self,
-        output: c_int,
-        status: *mut mpi_sys::MPI_Status,
-        datatype: mpi_sys::MPI_Datatype,
-        count: mpi_sys::MPI_Count,
-    ) {
-    }
-    #[inline]
-    fn pre_test(
-        &mut self,
+    fn test<F>(
+        &self,
+        next_f: F,
         request: *mut mpi_sys::MPI_Request,
         flag: *mut c_int,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Request, *mut c_int, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(request, flag, status)
     }
     #[inline]
-    fn post_test(
-        &mut self,
-        output: c_int,
-        request: *mut mpi_sys::MPI_Request,
-        flag: *mut c_int,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_test_cancelled(&mut self, status: *const mpi_sys::MPI_Status, flag: *mut c_int) {}
-    #[inline]
-    fn post_test_cancelled(
-        &mut self,
-        output: c_int,
+    fn test_cancelled<F>(
+        &self,
+        next_f: F,
         status: *const mpi_sys::MPI_Status,
         flag: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const mpi_sys::MPI_Status, *mut c_int) -> c_int,
+    {
+        next_f(status, flag)
     }
     #[inline]
-    fn pre_testall(
-        &mut self,
+    fn testall<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
         flag: *mut c_int,
         array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, *mut mpi_sys::MPI_Request, *mut c_int, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(count, array_of_requests, flag, array_of_statuses)
     }
     #[inline]
-    fn post_testall(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_requests: *mut mpi_sys::MPI_Request,
-        flag: *mut c_int,
-        array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_testany(
-        &mut self,
+    fn testany<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
         index: *mut c_int,
         flag: *mut c_int,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *mut mpi_sys::MPI_Request,
+            *mut c_int,
+            *mut c_int,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(count, array_of_requests, index, flag, status)
     }
     #[inline]
-    fn post_testany(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_requests: *mut mpi_sys::MPI_Request,
-        index: *mut c_int,
-        flag: *mut c_int,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_testsome(
-        &mut self,
+    fn testsome<F>(
+        &self,
+        next_f: F,
         incount: c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
         outcount: *mut c_int,
         array_of_indices: *mut c_int,
         array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *mut mpi_sys::MPI_Request,
+            *mut c_int,
+            *mut c_int,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(
+            incount,
+            array_of_requests,
+            outcount,
+            array_of_indices,
+            array_of_statuses,
+        )
     }
     #[inline]
-    fn post_testsome(
-        &mut self,
-        output: c_int,
-        incount: c_int,
-        array_of_requests: *mut mpi_sys::MPI_Request,
-        outcount: *mut c_int,
-        array_of_indices: *mut c_int,
-        array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
+    fn topo_test<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, status: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
+    {
+        next_f(comm, status)
     }
     #[inline]
-    fn pre_topo_test(&mut self, comm: mpi_sys::MPI_Comm, status: *mut c_int) {}
+    fn type_commit<F>(&self, next_f: F, r#type: *mut mpi_sys::MPI_Datatype) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(r#type)
+    }
     #[inline]
-    fn post_topo_test(&mut self, output: c_int, comm: mpi_sys::MPI_Comm, status: *mut c_int) {}
-    #[inline]
-    fn pre_type_commit(&mut self, r#type: *mut mpi_sys::MPI_Datatype) {}
-    #[inline]
-    fn post_type_commit(&mut self, output: c_int, r#type: *mut mpi_sys::MPI_Datatype) {}
-    #[inline]
-    fn pre_type_contiguous(
-        &mut self,
+    fn type_contiguous<F>(
+        &self,
+        next_f: F,
         count: c_int,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(count, oldtype, newtype)
     }
     #[inline]
-    fn post_type_contiguous(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_darray(
-        &mut self,
+    fn type_create_darray<F>(
+        &self,
+        next_f: F,
         size: c_int,
         rank: c_int,
         ndims: c_int,
@@ -4798,214 +4884,236 @@ pub trait QmpiLayer {
         order: c_int,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            c_int,
+            c_int,
+            *const c_int,
+            *const c_int,
+            *const c_int,
+            *const c_int,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            size,
+            rank,
+            ndims,
+            gsize_array,
+            distrib_array,
+            darg_array,
+            psize_array,
+            order,
+            oldtype,
+            newtype,
+        )
     }
     #[inline]
-    fn post_type_create_darray(
-        &mut self,
-        output: c_int,
-        size: c_int,
-        rank: c_int,
-        ndims: c_int,
-        gsize_array: *const c_int,
-        distrib_array: *const c_int,
-        darg_array: *const c_int,
-        psize_array: *const c_int,
-        order: c_int,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_f90_complex(
-        &mut self,
+    fn type_create_f90_complex<F>(
+        &self,
+        next_f: F,
         p: c_int,
         r: c_int,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, c_int, *mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(p, r, newtype)
     }
     #[inline]
-    fn post_type_create_f90_complex(
-        &mut self,
-        output: c_int,
+    fn type_create_f90_integer<F>(
+        &self,
+        next_f: F,
+        r: c_int,
+        newtype: *mut mpi_sys::MPI_Datatype,
+    ) -> c_int
+    where
+        F: FnOnce(c_int, *mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(r, newtype)
+    }
+    #[inline]
+    fn type_create_f90_real<F>(
+        &self,
+        next_f: F,
         p: c_int,
         r: c_int,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, c_int, *mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(p, r, newtype)
     }
     #[inline]
-    fn pre_type_create_f90_integer(&mut self, r: c_int, newtype: *mut mpi_sys::MPI_Datatype) {}
-    #[inline]
-    fn post_type_create_f90_integer(
-        &mut self,
-        output: c_int,
-        r: c_int,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_f90_real(
-        &mut self,
-        p: c_int,
-        r: c_int,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_type_create_f90_real(
-        &mut self,
-        output: c_int,
-        p: c_int,
-        r: c_int,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_hindexed(
-        &mut self,
+    fn type_create_hindexed<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_blocklengths: *const c_int,
         array_of_displacements: *const mpi_sys::MPI_Aint,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *const c_int,
+            *const mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            count,
+            array_of_blocklengths,
+            array_of_displacements,
+            oldtype,
+            newtype,
+        )
     }
     #[inline]
-    fn post_type_create_hindexed(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_blocklengths: *const c_int,
-        array_of_displacements: *const mpi_sys::MPI_Aint,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_hindexed_block(
-        &mut self,
-        count: c_int,
-        blocklength: c_int,
-        array_of_displacements: *const mpi_sys::MPI_Aint,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_type_create_hindexed_block(
-        &mut self,
-        output: c_int,
+    fn type_create_hindexed_block<F>(
+        &self,
+        next_f: F,
         count: c_int,
         blocklength: c_int,
         array_of_displacements: *const mpi_sys::MPI_Aint,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            c_int,
+            *const mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(count, blocklength, array_of_displacements, oldtype, newtype)
     }
     #[inline]
-    fn pre_type_create_hvector(
-        &mut self,
+    fn type_create_hvector<F>(
+        &self,
+        next_f: F,
         count: c_int,
         blocklength: c_int,
         stride: mpi_sys::MPI_Aint,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            c_int,
+            mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(count, blocklength, stride, oldtype, newtype)
     }
     #[inline]
-    fn post_type_create_hvector(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        blocklength: c_int,
-        stride: mpi_sys::MPI_Aint,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_indexed_block(
-        &mut self,
-        count: c_int,
-        blocklength: c_int,
-        array_of_displacements: *const c_int,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_type_create_indexed_block(
-        &mut self,
-        output: c_int,
+    fn type_create_indexed_block<F>(
+        &self,
+        next_f: F,
         count: c_int,
         blocklength: c_int,
         array_of_displacements: *const c_int,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(count, blocklength, array_of_displacements, oldtype, newtype)
     }
     #[inline]
-    fn pre_type_create_keyval(
-        &mut self,
+    fn type_create_keyval<F>(
+        &self,
+        next_f: F,
         type_copy_attr_fn: *mut mpi_sys::MPI_Type_copy_attr_function,
         type_delete_attr_fn: *mut mpi_sys::MPI_Type_delete_attr_function,
         type_keyval: *mut c_int,
         extra_state: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut mpi_sys::MPI_Type_copy_attr_function,
+            *mut mpi_sys::MPI_Type_delete_attr_function,
+            *mut c_int,
+            *mut c_void,
+        ) -> c_int,
+    {
+        next_f(
+            type_copy_attr_fn,
+            type_delete_attr_fn,
+            type_keyval,
+            extra_state,
+        )
     }
     #[inline]
-    fn post_type_create_keyval(
-        &mut self,
-        output: c_int,
-        type_copy_attr_fn: *mut mpi_sys::MPI_Type_copy_attr_function,
-        type_delete_attr_fn: *mut mpi_sys::MPI_Type_delete_attr_function,
-        type_keyval: *mut c_int,
-        extra_state: *mut c_void,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_resized(
-        &mut self,
+    fn type_create_resized<F>(
+        &self,
+        next_f: F,
         oldtype: mpi_sys::MPI_Datatype,
         lb: mpi_sys::MPI_Aint,
         extent: mpi_sys::MPI_Aint,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Aint,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(oldtype, lb, extent, newtype)
     }
     #[inline]
-    fn post_type_create_resized(
-        &mut self,
-        output: c_int,
-        oldtype: mpi_sys::MPI_Datatype,
-        lb: mpi_sys::MPI_Aint,
-        extent: mpi_sys::MPI_Aint,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_struct(
-        &mut self,
+    fn type_create_struct<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_block_lengths: *const c_int,
         array_of_displacements: *const mpi_sys::MPI_Aint,
         array_of_types: *const mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *const c_int,
+            *const mpi_sys::MPI_Aint,
+            *const mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            count,
+            array_of_block_lengths,
+            array_of_displacements,
+            array_of_types,
+            newtype,
+        )
     }
     #[inline]
-    fn post_type_create_struct(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_block_lengths: *const c_int,
-        array_of_displacements: *const mpi_sys::MPI_Aint,
-        array_of_types: *const mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_create_subarray(
-        &mut self,
+    fn type_create_subarray<F>(
+        &self,
+        next_f: F,
         ndims: c_int,
         size_array: *const c_int,
         subsize_array: *const c_int,
@@ -5013,82 +5121,96 @@ pub trait QmpiLayer {
         order: c_int,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *const c_int,
+            *const c_int,
+            *const c_int,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            ndims,
+            size_array,
+            subsize_array,
+            start_array,
+            order,
+            oldtype,
+            newtype,
+        )
     }
     #[inline]
-    fn post_type_create_subarray(
-        &mut self,
-        output: c_int,
-        ndims: c_int,
-        size_array: *const c_int,
-        subsize_array: *const c_int,
-        start_array: *const c_int,
-        order: c_int,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_delete_attr(&mut self, r#type: mpi_sys::MPI_Datatype, type_keyval: c_int) {}
-    #[inline]
-    fn post_type_delete_attr(
-        &mut self,
-        output: c_int,
+    fn type_delete_attr<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         type_keyval: c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, c_int) -> c_int,
+    {
+        next_f(r#type, type_keyval)
     }
     #[inline]
-    fn pre_type_dup(&mut self, r#type: mpi_sys::MPI_Datatype, newtype: *mut mpi_sys::MPI_Datatype) {
-    }
-    #[inline]
-    fn post_type_dup(
-        &mut self,
-        output: c_int,
+    fn type_dup<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(r#type, newtype)
     }
     #[inline]
-    fn pre_type_extent(&mut self, r#type: mpi_sys::MPI_Datatype, extent: *mut mpi_sys::MPI_Aint) {}
-    #[inline]
-    fn post_type_extent(
-        &mut self,
-        output: c_int,
+    fn type_extent<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         extent: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(r#type, extent)
     }
     #[inline]
-    fn pre_type_free(&mut self, r#type: *mut mpi_sys::MPI_Datatype) {}
+    fn type_free<F>(&self, next_f: F, r#type: *mut mpi_sys::MPI_Datatype) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(r#type)
+    }
     #[inline]
-    fn post_type_free(&mut self, output: c_int, r#type: *mut mpi_sys::MPI_Datatype) {}
+    fn type_free_keyval<F>(&self, next_f: F, type_keyval: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(type_keyval)
+    }
     #[inline]
-    fn pre_type_free_keyval(&mut self, type_keyval: *mut c_int) {}
-    #[inline]
-    fn post_type_free_keyval(&mut self, output: c_int, type_keyval: *mut c_int) {}
-    #[inline]
-    fn pre_type_get_attr(
-        &mut self,
+    fn type_get_attr<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         type_keyval: c_int,
         attribute_val: *mut c_void,
         flag: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, c_int, *mut c_void, *mut c_int) -> c_int,
+    {
+        next_f(r#type, type_keyval, attribute_val, flag)
     }
     #[inline]
-    fn post_type_get_attr(
-        &mut self,
-        output: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        type_keyval: c_int,
-        attribute_val: *mut c_void,
-        flag: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_type_get_contents(
-        &mut self,
+    fn type_get_contents<F>(
+        &self,
+        next_f: F,
         mtype: mpi_sys::MPI_Datatype,
         max_integers: c_int,
         max_addresses: c_int,
@@ -5096,313 +5218,310 @@ pub trait QmpiLayer {
         array_of_integers: *mut c_int,
         array_of_addresses: *mut mpi_sys::MPI_Aint,
         array_of_datatypes: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Datatype,
+            c_int,
+            c_int,
+            c_int,
+            *mut c_int,
+            *mut mpi_sys::MPI_Aint,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            mtype,
+            max_integers,
+            max_addresses,
+            max_datatypes,
+            array_of_integers,
+            array_of_addresses,
+            array_of_datatypes,
+        )
     }
     #[inline]
-    fn post_type_get_contents(
-        &mut self,
-        output: c_int,
-        mtype: mpi_sys::MPI_Datatype,
-        max_integers: c_int,
-        max_addresses: c_int,
-        max_datatypes: c_int,
-        array_of_integers: *mut c_int,
-        array_of_addresses: *mut mpi_sys::MPI_Aint,
-        array_of_datatypes: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_get_envelope(
-        &mut self,
+    fn type_get_envelope<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         num_integers: *mut c_int,
         num_addresses: *mut c_int,
         num_datatypes: *mut c_int,
         combiner: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut c_int, *mut c_int, *mut c_int, *mut c_int) -> c_int,
+    {
+        next_f(r#type, num_integers, num_addresses, num_datatypes, combiner)
     }
     #[inline]
-    fn post_type_get_envelope(
-        &mut self,
-        output: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        num_integers: *mut c_int,
-        num_addresses: *mut c_int,
-        num_datatypes: *mut c_int,
-        combiner: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_type_get_extent(
-        &mut self,
+    fn type_get_extent<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         lb: *mut mpi_sys::MPI_Aint,
         extent: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(r#type, lb, extent)
     }
     #[inline]
-    fn post_type_get_extent(
-        &mut self,
-        output: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        lb: *mut mpi_sys::MPI_Aint,
-        extent: *mut mpi_sys::MPI_Aint,
-    ) {
-    }
-    #[inline]
-    fn pre_type_get_extent_x(
-        &mut self,
+    fn type_get_extent_x<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         lb: *mut mpi_sys::MPI_Count,
         extent: *mut mpi_sys::MPI_Count,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Count, *mut mpi_sys::MPI_Count) -> c_int,
+    {
+        next_f(r#type, lb, extent)
     }
     #[inline]
-    fn post_type_get_extent_x(
-        &mut self,
-        output: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        lb: *mut mpi_sys::MPI_Count,
-        extent: *mut mpi_sys::MPI_Count,
-    ) {
-    }
-    #[inline]
-    fn pre_type_get_name(
-        &mut self,
+    fn type_get_name<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         type_name: *mut c_char,
         resultlen: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut c_char, *mut c_int) -> c_int,
+    {
+        next_f(r#type, type_name, resultlen)
     }
     #[inline]
-    fn post_type_get_name(
-        &mut self,
-        output: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        type_name: *mut c_char,
-        resultlen: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_type_get_true_extent(
-        &mut self,
+    fn type_get_true_extent<F>(
+        &self,
+        next_f: F,
         datatype: mpi_sys::MPI_Datatype,
         true_lb: *mut mpi_sys::MPI_Aint,
         true_extent: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(datatype, true_lb, true_extent)
     }
     #[inline]
-    fn post_type_get_true_extent(
-        &mut self,
-        output: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        true_lb: *mut mpi_sys::MPI_Aint,
-        true_extent: *mut mpi_sys::MPI_Aint,
-    ) {
-    }
-    #[inline]
-    fn pre_type_get_true_extent_x(
-        &mut self,
+    fn type_get_true_extent_x<F>(
+        &self,
+        next_f: F,
         datatype: mpi_sys::MPI_Datatype,
         true_lb: *mut mpi_sys::MPI_Count,
         true_extent: *mut mpi_sys::MPI_Count,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Count, *mut mpi_sys::MPI_Count) -> c_int,
+    {
+        next_f(datatype, true_lb, true_extent)
     }
     #[inline]
-    fn post_type_get_true_extent_x(
-        &mut self,
-        output: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        true_lb: *mut mpi_sys::MPI_Count,
-        true_extent: *mut mpi_sys::MPI_Count,
-    ) {
-    }
-    #[inline]
-    fn pre_type_hindexed(
-        &mut self,
+    fn type_hindexed<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_blocklengths: *mut c_int,
         array_of_displacements: *mut mpi_sys::MPI_Aint,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *mut c_int,
+            *mut mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            count,
+            array_of_blocklengths,
+            array_of_displacements,
+            oldtype,
+            newtype,
+        )
     }
     #[inline]
-    fn post_type_hindexed(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_blocklengths: *mut c_int,
-        array_of_displacements: *mut mpi_sys::MPI_Aint,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_hvector(
-        &mut self,
-        count: c_int,
-        blocklength: c_int,
-        stride: mpi_sys::MPI_Aint,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn post_type_hvector(
-        &mut self,
-        output: c_int,
+    fn type_hvector<F>(
+        &self,
+        next_f: F,
         count: c_int,
         blocklength: c_int,
         stride: mpi_sys::MPI_Aint,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            c_int,
+            mpi_sys::MPI_Aint,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(count, blocklength, stride, oldtype, newtype)
     }
     #[inline]
-    fn pre_type_indexed(
-        &mut self,
+    fn type_indexed<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_blocklengths: *const c_int,
         array_of_displacements: *const c_int,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *const c_int,
+            *const c_int,
+            mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            count,
+            array_of_blocklengths,
+            array_of_displacements,
+            oldtype,
+            newtype,
+        )
     }
     #[inline]
-    fn post_type_indexed(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_blocklengths: *const c_int,
-        array_of_displacements: *const c_int,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_lb(&mut self, r#type: mpi_sys::MPI_Datatype, lb: *mut mpi_sys::MPI_Aint) {}
-    #[inline]
-    fn post_type_lb(
-        &mut self,
-        output: c_int,
+    fn type_lb<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         lb: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(r#type, lb)
     }
     #[inline]
-    fn pre_type_match_size(
-        &mut self,
+    fn type_match_size<F>(
+        &self,
+        next_f: F,
         typeclass: c_int,
         size: c_int,
         r#type: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, c_int, *mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(typeclass, size, r#type)
     }
     #[inline]
-    fn post_type_match_size(
-        &mut self,
-        output: c_int,
-        typeclass: c_int,
-        size: c_int,
-        r#type: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_set_attr(
-        &mut self,
+    fn type_set_attr<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         type_keyval: c_int,
         attr_val: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, c_int, *mut c_void) -> c_int,
+    {
+        next_f(r#type, type_keyval, attr_val)
     }
     #[inline]
-    fn post_type_set_attr(
-        &mut self,
-        output: c_int,
-        r#type: mpi_sys::MPI_Datatype,
-        type_keyval: c_int,
-        attr_val: *mut c_void,
-    ) {
-    }
-    #[inline]
-    fn pre_type_set_name(&mut self, r#type: mpi_sys::MPI_Datatype, type_name: *const c_char) {}
-    #[inline]
-    fn post_type_set_name(
-        &mut self,
-        output: c_int,
+    fn type_set_name<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         type_name: *const c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *const c_char) -> c_int,
+    {
+        next_f(r#type, type_name)
     }
     #[inline]
-    fn pre_type_size(&mut self, r#type: mpi_sys::MPI_Datatype, size: *mut c_int) {}
+    fn type_size<F>(&self, next_f: F, r#type: mpi_sys::MPI_Datatype, size: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut c_int) -> c_int,
+    {
+        next_f(r#type, size)
+    }
     #[inline]
-    fn post_type_size(&mut self, output: c_int, r#type: mpi_sys::MPI_Datatype, size: *mut c_int) {}
-    #[inline]
-    fn pre_type_size_x(&mut self, r#type: mpi_sys::MPI_Datatype, size: *mut mpi_sys::MPI_Count) {}
-    #[inline]
-    fn post_type_size_x(
-        &mut self,
-        output: c_int,
+    fn type_size_x<F>(
+        &self,
+        next_f: F,
         r#type: mpi_sys::MPI_Datatype,
         size: *mut mpi_sys::MPI_Count,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Count) -> c_int,
+    {
+        next_f(r#type, size)
     }
     #[inline]
-    fn pre_type_struct(
-        &mut self,
+    fn type_struct<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_blocklengths: *mut c_int,
         array_of_displacements: *mut mpi_sys::MPI_Aint,
         array_of_types: *mut mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *mut c_int,
+            *mut mpi_sys::MPI_Aint,
+            *mut mpi_sys::MPI_Datatype,
+            *mut mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(
+            count,
+            array_of_blocklengths,
+            array_of_displacements,
+            array_of_types,
+            newtype,
+        )
     }
     #[inline]
-    fn post_type_struct(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_blocklengths: *mut c_int,
-        array_of_displacements: *mut mpi_sys::MPI_Aint,
-        array_of_types: *mut mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_type_ub(&mut self, mtype: mpi_sys::MPI_Datatype, ub: *mut mpi_sys::MPI_Aint) {}
-    #[inline]
-    fn post_type_ub(
-        &mut self,
-        output: c_int,
+    fn type_ub<F>(
+        &self,
+        next_f: F,
         mtype: mpi_sys::MPI_Datatype,
         ub: *mut mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(mtype, ub)
     }
     #[inline]
-    fn pre_type_vector(
-        &mut self,
+    fn type_vector<F>(
+        &self,
+        next_f: F,
         count: c_int,
         blocklength: c_int,
         stride: c_int,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, c_int, c_int, mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Datatype) -> c_int,
+    {
+        next_f(count, blocklength, stride, oldtype, newtype)
     }
     #[inline]
-    fn post_type_vector(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        blocklength: c_int,
-        stride: c_int,
-        oldtype: mpi_sys::MPI_Datatype,
-        newtype: *mut mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_unpack(
-        &mut self,
+    fn unpack<F>(
+        &self,
+        next_f: F,
         inbuf: *const c_void,
         insize: c_int,
         position: *mut c_int,
@@ -5410,24 +5529,24 @@ pub trait QmpiLayer {
         outcount: c_int,
         datatype: mpi_sys::MPI_Datatype,
         comm: mpi_sys::MPI_Comm,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_void,
+            c_int,
+            *mut c_int,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+            mpi_sys::MPI_Comm,
+        ) -> c_int,
+    {
+        next_f(inbuf, insize, position, outbuf, outcount, datatype, comm)
     }
     #[inline]
-    fn post_unpack(
-        &mut self,
-        output: c_int,
-        inbuf: *const c_void,
-        insize: c_int,
-        position: *mut c_int,
-        outbuf: *mut c_void,
-        outcount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-        comm: mpi_sys::MPI_Comm,
-    ) {
-    }
-    #[inline]
-    fn pre_unpack_external(
-        &mut self,
+    fn unpack_external<F>(
+        &self,
+        next_f: F,
         datarep: *const c_char,
         inbuf: *const c_void,
         insize: mpi_sys::MPI_Aint,
@@ -5435,492 +5554,524 @@ pub trait QmpiLayer {
         outbuf: *mut c_void,
         outcount: c_int,
         datatype: mpi_sys::MPI_Datatype,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *const c_char,
+            *const c_void,
+            mpi_sys::MPI_Aint,
+            *mut mpi_sys::MPI_Aint,
+            *mut c_void,
+            c_int,
+            mpi_sys::MPI_Datatype,
+        ) -> c_int,
+    {
+        next_f(datarep, inbuf, insize, position, outbuf, outcount, datatype)
     }
     #[inline]
-    fn post_unpack_external(
-        &mut self,
-        output: c_int,
-        datarep: *const c_char,
-        inbuf: *const c_void,
-        insize: mpi_sys::MPI_Aint,
-        position: *mut mpi_sys::MPI_Aint,
-        outbuf: *mut c_void,
-        outcount: c_int,
-        datatype: mpi_sys::MPI_Datatype,
-    ) {
-    }
-    #[inline]
-    fn pre_unpublish_name(
-        &mut self,
+    fn unpublish_name<F>(
+        &self,
+        next_f: F,
         service_name: *const c_char,
         info: mpi_sys::MPI_Info,
         port_name: *const c_char,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*const c_char, mpi_sys::MPI_Info, *const c_char) -> c_int,
+    {
+        next_f(service_name, info, port_name)
     }
     #[inline]
-    fn post_unpublish_name(
-        &mut self,
-        output: c_int,
-        service_name: *const c_char,
-        info: mpi_sys::MPI_Info,
-        port_name: *const c_char,
-    ) {
-    }
-    #[inline]
-    fn pre_wait(&mut self, request: *mut mpi_sys::MPI_Request, status: *mut mpi_sys::MPI_Status) {}
-    #[inline]
-    fn post_wait(
-        &mut self,
-        output: c_int,
+    fn wait<F>(
+        &self,
+        next_f: F,
         request: *mut mpi_sys::MPI_Request,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Request, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(request, status)
     }
     #[inline]
-    fn pre_waitall(
-        &mut self,
+    fn waitall<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
         array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, *mut mpi_sys::MPI_Request, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(count, array_of_requests, array_of_statuses)
     }
     #[inline]
-    fn post_waitall(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_requests: *mut mpi_sys::MPI_Request,
-        array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_waitany(
-        &mut self,
+    fn waitany<F>(
+        &self,
+        next_f: F,
         count: c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
         index: *mut c_int,
         status: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, *mut mpi_sys::MPI_Request, *mut c_int, *mut mpi_sys::MPI_Status) -> c_int,
+    {
+        next_f(count, array_of_requests, index, status)
     }
     #[inline]
-    fn post_waitany(
-        &mut self,
-        output: c_int,
-        count: c_int,
-        array_of_requests: *mut mpi_sys::MPI_Request,
-        index: *mut c_int,
-        status: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_waitsome(
-        &mut self,
+    fn waitsome<F>(
+        &self,
+        next_f: F,
         incount: c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
         outcount: *mut c_int,
         array_of_indices: *mut c_int,
         array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            c_int,
+            *mut mpi_sys::MPI_Request,
+            *mut c_int,
+            *mut c_int,
+            *mut mpi_sys::MPI_Status,
+        ) -> c_int,
+    {
+        next_f(
+            incount,
+            array_of_requests,
+            outcount,
+            array_of_indices,
+            array_of_statuses,
+        )
     }
     #[inline]
-    fn post_waitsome(
-        &mut self,
-        output: c_int,
-        incount: c_int,
-        array_of_requests: *mut mpi_sys::MPI_Request,
-        outcount: *mut c_int,
-        array_of_indices: *mut c_int,
-        array_of_statuses: *mut mpi_sys::MPI_Status,
-    ) {
-    }
-    #[inline]
-    fn pre_win_allocate(
-        &mut self,
+    fn win_allocate<F>(
+        &self,
+        next_f: F,
         size: mpi_sys::MPI_Aint,
         disp_unit: c_int,
         info: mpi_sys::MPI_Info,
         comm: mpi_sys::MPI_Comm,
         baseptr: *mut c_void,
         win: *mut mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Info,
+            mpi_sys::MPI_Comm,
+            *mut c_void,
+            *mut mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(size, disp_unit, info, comm, baseptr, win)
     }
     #[inline]
-    fn post_win_allocate(
-        &mut self,
-        output: c_int,
+    fn win_allocate_shared<F>(
+        &self,
+        next_f: F,
         size: mpi_sys::MPI_Aint,
         disp_unit: c_int,
         info: mpi_sys::MPI_Info,
         comm: mpi_sys::MPI_Comm,
         baseptr: *mut c_void,
         win: *mut mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Info,
+            mpi_sys::MPI_Comm,
+            *mut c_void,
+            *mut mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(size, disp_unit, info, comm, baseptr, win)
     }
     #[inline]
-    fn pre_win_allocate_shared(
-        &mut self,
-        size: mpi_sys::MPI_Aint,
-        disp_unit: c_int,
-        info: mpi_sys::MPI_Info,
-        comm: mpi_sys::MPI_Comm,
-        baseptr: *mut c_void,
-        win: *mut mpi_sys::MPI_Win,
-    ) {
-    }
-    #[inline]
-    fn post_win_allocate_shared(
-        &mut self,
-        output: c_int,
-        size: mpi_sys::MPI_Aint,
-        disp_unit: c_int,
-        info: mpi_sys::MPI_Info,
-        comm: mpi_sys::MPI_Comm,
-        baseptr: *mut c_void,
-        win: *mut mpi_sys::MPI_Win,
-    ) {
-    }
-    #[inline]
-    fn pre_win_attach(
-        &mut self,
+    fn win_attach<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         base: *mut c_void,
         size: mpi_sys::MPI_Aint,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *mut c_void, mpi_sys::MPI_Aint) -> c_int,
+    {
+        next_f(win, base, size)
     }
     #[inline]
-    fn post_win_attach(
-        &mut self,
-        output: c_int,
-        win: mpi_sys::MPI_Win,
-        base: *mut c_void,
-        size: mpi_sys::MPI_Aint,
-    ) {
+    fn win_call_errhandler<F>(&self, next_f: F, win: mpi_sys::MPI_Win, errorcode: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, c_int) -> c_int,
+    {
+        next_f(win, errorcode)
     }
     #[inline]
-    fn pre_win_call_errhandler(&mut self, win: mpi_sys::MPI_Win, errorcode: c_int) {}
-    #[inline]
-    fn post_win_call_errhandler(&mut self, output: c_int, win: mpi_sys::MPI_Win, errorcode: c_int) {
+    fn win_complete<F>(&self, next_f: F, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(win)
     }
     #[inline]
-    fn pre_win_complete(&mut self, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_complete(&mut self, output: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_win_create(
-        &mut self,
-        base: *mut c_void,
-        size: mpi_sys::MPI_Aint,
-        disp_unit: c_int,
-        info: mpi_sys::MPI_Info,
-        comm: mpi_sys::MPI_Comm,
-        win: *mut mpi_sys::MPI_Win,
-    ) {
-    }
-    #[inline]
-    fn post_win_create(
-        &mut self,
-        output: c_int,
+    fn win_create<F>(
+        &self,
+        next_f: F,
         base: *mut c_void,
         size: mpi_sys::MPI_Aint,
         disp_unit: c_int,
         info: mpi_sys::MPI_Info,
         comm: mpi_sys::MPI_Comm,
         win: *mut mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut c_void,
+            mpi_sys::MPI_Aint,
+            c_int,
+            mpi_sys::MPI_Info,
+            mpi_sys::MPI_Comm,
+            *mut mpi_sys::MPI_Win,
+        ) -> c_int,
+    {
+        next_f(base, size, disp_unit, info, comm, win)
     }
     #[inline]
-    fn pre_win_create_dynamic(
-        &mut self,
+    fn win_create_dynamic<F>(
+        &self,
+        next_f: F,
         info: mpi_sys::MPI_Info,
         comm: mpi_sys::MPI_Comm,
         win: *mut mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Info, mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(info, comm, win)
     }
     #[inline]
-    fn post_win_create_dynamic(
-        &mut self,
-        output: c_int,
-        info: mpi_sys::MPI_Info,
-        comm: mpi_sys::MPI_Comm,
-        win: *mut mpi_sys::MPI_Win,
-    ) {
-    }
-    #[inline]
-    fn pre_win_create_errhandler(
-        &mut self,
+    fn win_create_errhandler<F>(
+        &self,
+        next_f: F,
         function: *mut mpi_sys::MPI_Win_errhandler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Win_errhandler_function, *mut mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(function, errhandler)
     }
     #[inline]
-    fn post_win_create_errhandler(
-        &mut self,
-        output: c_int,
-        function: *mut mpi_sys::MPI_Win_errhandler_function,
-        errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
-    }
-    #[inline]
-    fn pre_win_create_keyval(
-        &mut self,
+    fn win_create_keyval<F>(
+        &self,
+        next_f: F,
         win_copy_attr_fn: *mut mpi_sys::MPI_Win_copy_attr_function,
         win_delete_attr_fn: *mut mpi_sys::MPI_Win_delete_attr_function,
         win_keyval: *mut c_int,
         extra_state: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            *mut mpi_sys::MPI_Win_copy_attr_function,
+            *mut mpi_sys::MPI_Win_delete_attr_function,
+            *mut c_int,
+            *mut c_void,
+        ) -> c_int,
+    {
+        next_f(
+            win_copy_attr_fn,
+            win_delete_attr_fn,
+            win_keyval,
+            extra_state,
+        )
     }
     #[inline]
-    fn post_win_create_keyval(
-        &mut self,
-        output: c_int,
-        win_copy_attr_fn: *mut mpi_sys::MPI_Win_copy_attr_function,
-        win_delete_attr_fn: *mut mpi_sys::MPI_Win_delete_attr_function,
-        win_keyval: *mut c_int,
-        extra_state: *mut c_void,
-    ) {
+    fn win_delete_attr<F>(&self, next_f: F, win: mpi_sys::MPI_Win, win_keyval: c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, c_int) -> c_int,
+    {
+        next_f(win, win_keyval)
     }
     #[inline]
-    fn pre_win_delete_attr(&mut self, win: mpi_sys::MPI_Win, win_keyval: c_int) {}
+    fn win_detach<F>(&self, next_f: F, win: mpi_sys::MPI_Win, base: *const c_void) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *const c_void) -> c_int,
+    {
+        next_f(win, base)
+    }
     #[inline]
-    fn post_win_delete_attr(&mut self, output: c_int, win: mpi_sys::MPI_Win, win_keyval: c_int) {}
+    fn win_fence<F>(&self, next_f: F, assert: c_int, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(assert, win)
+    }
     #[inline]
-    fn pre_win_detach(&mut self, win: mpi_sys::MPI_Win, base: *const c_void) {}
+    fn win_flush<F>(&self, next_f: F, rank: c_int, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(rank, win)
+    }
     #[inline]
-    fn post_win_detach(&mut self, output: c_int, win: mpi_sys::MPI_Win, base: *const c_void) {}
+    fn win_flush_all<F>(&self, next_f: F, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(win)
+    }
     #[inline]
-    fn pre_win_fence(&mut self, assert: c_int, win: mpi_sys::MPI_Win) {}
+    fn win_flush_local<F>(&self, next_f: F, rank: c_int, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(rank, win)
+    }
     #[inline]
-    fn post_win_fence(&mut self, output: c_int, assert: c_int, win: mpi_sys::MPI_Win) {}
+    fn win_flush_local_all<F>(&self, next_f: F, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(win)
+    }
     #[inline]
-    fn pre_win_flush(&mut self, rank: c_int, win: mpi_sys::MPI_Win) {}
+    fn win_free<F>(&self, next_f: F, win: *mut mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(*mut mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(win)
+    }
     #[inline]
-    fn post_win_flush(&mut self, output: c_int, rank: c_int, win: mpi_sys::MPI_Win) {}
+    fn win_free_keyval<F>(&self, next_f: F, win_keyval: *mut c_int) -> c_int
+    where
+        F: FnOnce(*mut c_int) -> c_int,
+    {
+        next_f(win_keyval)
+    }
     #[inline]
-    fn pre_win_flush_all(&mut self, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_flush_all(&mut self, output: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_win_flush_local(&mut self, rank: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_flush_local(&mut self, output: c_int, rank: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_win_flush_local_all(&mut self, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_flush_local_all(&mut self, output: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_win_free(&mut self, win: *mut mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_free(&mut self, output: c_int, win: *mut mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_win_free_keyval(&mut self, win_keyval: *mut c_int) {}
-    #[inline]
-    fn post_win_free_keyval(&mut self, output: c_int, win_keyval: *mut c_int) {}
-    #[inline]
-    fn pre_win_get_attr(
-        &mut self,
+    fn win_get_attr<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         win_keyval: c_int,
         attribute_val: *mut c_void,
         flag: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, c_int, *mut c_void, *mut c_int) -> c_int,
+    {
+        next_f(win, win_keyval, attribute_val, flag)
     }
     #[inline]
-    fn post_win_get_attr(
-        &mut self,
-        output: c_int,
-        win: mpi_sys::MPI_Win,
-        win_keyval: c_int,
-        attribute_val: *mut c_void,
-        flag: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_win_get_errhandler(
-        &mut self,
+    fn win_get_errhandler<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *mut mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(win, errhandler)
     }
     #[inline]
-    fn post_win_get_errhandler(
-        &mut self,
-        output: c_int,
-        win: mpi_sys::MPI_Win,
-        errhandler: *mut mpi_sys::MPI_Errhandler,
-    ) {
-    }
-    #[inline]
-    fn pre_win_get_group(&mut self, win: mpi_sys::MPI_Win, group: *mut mpi_sys::MPI_Group) {}
-    #[inline]
-    fn post_win_get_group(
-        &mut self,
-        output: c_int,
+    fn win_get_group<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         group: *mut mpi_sys::MPI_Group,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *mut mpi_sys::MPI_Group) -> c_int,
+    {
+        next_f(win, group)
     }
     #[inline]
-    fn pre_win_get_info(&mut self, win: mpi_sys::MPI_Win, info_used: *mut mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_win_get_info(
-        &mut self,
-        output: c_int,
+    fn win_get_info<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         info_used: *mut mpi_sys::MPI_Info,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *mut mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(win, info_used)
     }
     #[inline]
-    fn pre_win_get_name(
-        &mut self,
+    fn win_get_name<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         win_name: *mut c_char,
         resultlen: *mut c_int,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *mut c_char, *mut c_int) -> c_int,
+    {
+        next_f(win, win_name, resultlen)
     }
     #[inline]
-    fn post_win_get_name(
-        &mut self,
-        output: c_int,
-        win: mpi_sys::MPI_Win,
-        win_name: *mut c_char,
-        resultlen: *mut c_int,
-    ) {
-    }
-    #[inline]
-    fn pre_win_lock(
-        &mut self,
+    fn win_lock<F>(
+        &self,
+        next_f: F,
         lock_type: c_int,
         rank: c_int,
         assert: c_int,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(c_int, c_int, c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(lock_type, rank, assert, win)
     }
     #[inline]
-    fn post_win_lock(
-        &mut self,
-        output: c_int,
-        lock_type: c_int,
-        rank: c_int,
-        assert: c_int,
-        win: mpi_sys::MPI_Win,
-    ) {
+    fn win_lock_all<F>(&self, next_f: F, assert: c_int, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(assert, win)
     }
     #[inline]
-    fn pre_win_lock_all(&mut self, assert: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_lock_all(&mut self, output: c_int, assert: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_win_post(&mut self, group: mpi_sys::MPI_Group, assert: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_post(
-        &mut self,
-        output: c_int,
+    fn win_post<F>(
+        &self,
+        next_f: F,
         group: mpi_sys::MPI_Group,
         assert: c_int,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(group, assert, win)
     }
     #[inline]
-    fn pre_win_set_attr(
-        &mut self,
+    fn win_set_attr<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         win_keyval: c_int,
         attribute_val: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, c_int, *mut c_void) -> c_int,
+    {
+        next_f(win, win_keyval, attribute_val)
     }
     #[inline]
-    fn post_win_set_attr(
-        &mut self,
-        output: c_int,
-        win: mpi_sys::MPI_Win,
-        win_keyval: c_int,
-        attribute_val: *mut c_void,
-    ) {
-    }
-    #[inline]
-    fn pre_win_set_errhandler(
-        &mut self,
+    fn win_set_errhandler<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         errhandler: mpi_sys::MPI_Errhandler,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, mpi_sys::MPI_Errhandler) -> c_int,
+    {
+        next_f(win, errhandler)
     }
     #[inline]
-    fn post_win_set_errhandler(
-        &mut self,
-        output: c_int,
-        win: mpi_sys::MPI_Win,
-        errhandler: mpi_sys::MPI_Errhandler,
-    ) {
+    fn win_set_info<F>(&self, next_f: F, win: mpi_sys::MPI_Win, info: mpi_sys::MPI_Info) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, mpi_sys::MPI_Info) -> c_int,
+    {
+        next_f(win, info)
     }
     #[inline]
-    fn pre_win_set_info(&mut self, win: mpi_sys::MPI_Win, info: mpi_sys::MPI_Info) {}
-    #[inline]
-    fn post_win_set_info(&mut self, output: c_int, win: mpi_sys::MPI_Win, info: mpi_sys::MPI_Info) {
+    fn win_set_name<F>(&self, next_f: F, win: mpi_sys::MPI_Win, win_name: *const c_char) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *const c_char) -> c_int,
+    {
+        next_f(win, win_name)
     }
     #[inline]
-    fn pre_win_set_name(&mut self, win: mpi_sys::MPI_Win, win_name: *const c_char) {}
-    #[inline]
-    fn post_win_set_name(&mut self, output: c_int, win: mpi_sys::MPI_Win, win_name: *const c_char) {
-    }
-    #[inline]
-    fn pre_win_shared_query(
-        &mut self,
+    fn win_shared_query<F>(
+        &self,
+        next_f: F,
         win: mpi_sys::MPI_Win,
         rank: c_int,
         size: *mut mpi_sys::MPI_Aint,
         disp_unit: *mut c_int,
         baseptr: *mut c_void,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(
+            mpi_sys::MPI_Win,
+            c_int,
+            *mut mpi_sys::MPI_Aint,
+            *mut c_int,
+            *mut c_void,
+        ) -> c_int,
+    {
+        next_f(win, rank, size, disp_unit, baseptr)
     }
     #[inline]
-    fn post_win_shared_query(
-        &mut self,
-        output: c_int,
-        win: mpi_sys::MPI_Win,
-        rank: c_int,
-        size: *mut mpi_sys::MPI_Aint,
-        disp_unit: *mut c_int,
-        baseptr: *mut c_void,
-    ) {
-    }
-    #[inline]
-    fn pre_win_start(&mut self, group: mpi_sys::MPI_Group, assert: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_start(
-        &mut self,
-        output: c_int,
+    fn win_start<F>(
+        &self,
+        next_f: F,
         group: mpi_sys::MPI_Group,
         assert: c_int,
         win: mpi_sys::MPI_Win,
-    ) {
+    ) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Group, c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(group, assert, win)
     }
     #[inline]
-    fn pre_win_sync(&mut self, win: mpi_sys::MPI_Win) {}
+    fn win_sync<F>(&self, next_f: F, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(win)
+    }
     #[inline]
-    fn post_win_sync(&mut self, output: c_int, win: mpi_sys::MPI_Win) {}
+    fn win_test<F>(&self, next_f: F, win: mpi_sys::MPI_Win, flag: *mut c_int) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win, *mut c_int) -> c_int,
+    {
+        next_f(win, flag)
+    }
     #[inline]
-    fn pre_win_test(&mut self, win: mpi_sys::MPI_Win, flag: *mut c_int) {}
+    fn win_unlock<F>(&self, next_f: F, rank: c_int, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(c_int, mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(rank, win)
+    }
     #[inline]
-    fn post_win_test(&mut self, output: c_int, win: mpi_sys::MPI_Win, flag: *mut c_int) {}
+    fn win_unlock_all<F>(&self, next_f: F, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(win)
+    }
     #[inline]
-    fn pre_win_unlock(&mut self, rank: c_int, win: mpi_sys::MPI_Win) {}
+    fn win_wait<F>(&self, next_f: F, win: mpi_sys::MPI_Win) -> c_int
+    where
+        F: FnOnce(mpi_sys::MPI_Win) -> c_int,
+    {
+        next_f(win)
+    }
     #[inline]
-    fn post_win_unlock(&mut self, output: c_int, rank: c_int, win: mpi_sys::MPI_Win) {}
+    fn wtick<F>(&self, next_f: F) -> c_double
+    where
+        F: FnOnce() -> c_double,
+    {
+        next_f()
+    }
     #[inline]
-    fn pre_win_unlock_all(&mut self, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_unlock_all(&mut self, output: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_win_wait(&mut self, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn post_win_wait(&mut self, output: c_int, win: mpi_sys::MPI_Win) {}
-    #[inline]
-    fn pre_wtick(&mut self) {}
-    #[inline]
-    fn post_wtick(&mut self, output: c_double) {}
-    #[inline]
-    fn pre_wtime(&mut self) {}
-    #[inline]
-    fn post_wtime(&mut self, output: c_double) {}
+    fn wtime<F>(&self, next_f: F) -> c_double
+    where
+        F: FnOnce() -> c_double,
+    {
+        next_f()
+    }
 }

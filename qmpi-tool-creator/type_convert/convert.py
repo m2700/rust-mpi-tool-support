@@ -9,6 +9,8 @@ with open("input.txt") as input_file:
             for line in input_file.readlines():
                 macro_arg_line = []
                 rust_arg_line = []
+                rust_arg_types = []
+                rust_arg_idents = []
                 line = line.strip()
                 if line.startswith("fn ") and line.endswith(";"):
                     line = line[3:-1].strip()
@@ -54,25 +56,24 @@ with open("input.txt") as input_file:
                                       "\" <arg_name> \"", post_arg, "\"", sep = "")
                                 exit(-1)
                             rust_arg_line.append(arg_name + ": " + repl_type)
+                            rust_arg_types.append(repl_type)
+                            rust_arg_idents.append(arg_name)
 
                     assert fn_ident.startswith("E_")
-                    pre_intercept_ident = "pre_" + fn_ident[2:].lower()
-                    post_intercept_ident = "post_" + fn_ident[2:].lower()
+                    intercept_ident = fn_ident[2:].lower()
+
                     type_convert_output_file.write(
                         "fn " + fn_ident + "[" + patterns.macro_mpi_func_id_prefix + fn_ident[2:] + ", "
-                         + pre_intercept_ident + ", " + post_intercept_ident
+                         + intercept_ident
                          + "](" + ", ".join(macro_arg_line) + ") -> "
                          + macro_rust_res_tp + ";\n"
                     )
 
                     trait_functions_output_file.write(
-                        "#[inline]fn " + pre_intercept_ident + "(&mut self, "
-                         + ", ".join(rust_arg_line) + ") " + "{}\n"
-                    )
-                    trait_functions_output_file.write(
-                        "#[inline]fn " + post_intercept_ident
-                         + "(&mut self, output: " + rust_res_tp + ", "
-                         + ", ".join(rust_arg_line) + ") " + "{}\n"
+                        "#[inline]fn " + intercept_ident + "<F>(&self, next_f: F, "
+                         + ", ".join(rust_arg_line) + ") -> " + rust_res_tp
+                         + " where F: FnOnce(" + ", ".join(rust_arg_types)
+                         + ") -> " + rust_res_tp + " {next_f(" + ",".join(rust_arg_idents) + ")}\n"
                     )
 
                 else:
