@@ -1,0 +1,2 @@
+[workspace]
+members = ["mpi-tool-creator", "mpi-test-tool"]

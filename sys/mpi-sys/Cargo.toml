@@ -1,0 +1,21 @@
+[package]
+name = "mpi-sys"
+version = "0.1.0"
+authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
+edition = "2018"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "*"
+
+[features]
+# expose MPI_* functions
+mpi_functions = []
+# link against mpi and therefore expose all mpi functions
+link_mpi = []
+# remap PMPI_* functions as MPI_*
+pmpi_tool_mode = []

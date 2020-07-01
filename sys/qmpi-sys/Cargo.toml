@@ -1,0 +1,24 @@
+[package]
+name = "qmpi-sys"
+version = "0.1.0"
+authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
+edition = "2018"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+mpi-sys = { path = "../mpi-sys", optional = true }
+
+[build-dependencies]
+bindgen = "*"
+hyper = "*"
+hyper-rustls = "*"
+tokio = { version = "*", features = ["full"] }
+cc = { version = "*", optional = true }
+
+[features]
+export_mpi = ["mpi-sys"]
+bundled = ["cc", "mpi-sys", "mpi-sys/mpi_functions"]
+tool_mode = ["mpi-sys", "mpi-sys/mpi_functions", "mpi-sys/pmpi_tool_mode", "link_mpi"]
+link_mpi = ["mpi-sys", "mpi-sys/link_mpi"]
