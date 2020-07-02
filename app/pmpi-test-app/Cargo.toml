@@ -1,14 +1,11 @@
 [package]
-name = "mpi-test-tool"
+name = "pmpi-test-app"
 version = "0.1.0"
 authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
 edition = "2018"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
-pmpi-tool-creator = { path = "../pmpi-tool-creator" }
-mpi-tool-layer = { path = "../mpi-tool-layer" }
+mpi-sys = { path = "../../sys/mpi-sys", features = ["mpi_functions", "link_mpi"] }

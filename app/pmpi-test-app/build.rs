@@ -1,6 +1,7 @@
+
+
 fn main() {
-    #[cfg(feature = "link_mpi_test_tool")]
-    {
+
         use std::path::Path;
 
         println!(
@@ -15,5 +16,5 @@ fn main() {
                 .display()
         );
         println!("cargo:rustc-link-lib=mpi_test_tool");
-    }
+
 }

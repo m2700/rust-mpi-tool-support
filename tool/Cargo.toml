@@ -1,2 +1,2 @@
 [workspace]
-members = ["mpi-tool-creator", "mpi-test-tool"]
+members = ["*mpi-tool-creator", "mpi-test-tool", "mpi-tool-layer"]

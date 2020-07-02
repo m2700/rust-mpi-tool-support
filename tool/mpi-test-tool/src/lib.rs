@@ -1,42 +1,43 @@
 use std::os::raw::{c_char, c_int, c_void};
 
-use mpi_tool_creator::{mpi_sys, MpiInterceptionLayer};
+use mpi_tool_layer::{RawMpiInterceptionLayer, UnsafeBox};
+use pmpi_tool_creator::mpi_sys;
 
 #[derive(Default)]
 struct MyQmpiLayer;
-impl MpiInterceptionLayer for MyQmpiLayer {
-    fn init<F>(&self, next_f: F, argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_int
+impl RawMpiInterceptionLayer for MyQmpiLayer {
+    fn init<F>(&self, next_f: UnsafeBox<F>, argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_int
     where
         F: FnOnce(*mut c_int, *mut *mut *mut c_char) -> c_int,
     {
         println!("[called init(..)]");
-        next_f(argc, argv)
+        unsafe { next_f.unwrap()(argc, argv) }
     }
-    fn pcontrol<F>(&self, next_f: F, level: c_int) -> c_int
+    fn pcontrol<F>(&self, next_f: UnsafeBox<F>, level: c_int) -> c_int
     where
         F: FnOnce(c_int) -> c_int,
     {
         println!("[called pcontrol({})]", level);
         println!("[call pcontrol({}) 'incremented']", level + 1);
-        next_f(level + 1)
+        unsafe { next_f.unwrap()(level + 1) }
     }
-    fn comm_size<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, size: *mut c_int) -> c_int
+    fn comm_size<F>(&self, next_f: UnsafeBox<F>, comm: mpi_sys::MPI_Comm, size: *mut c_int) -> c_int
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
     {
         println!("[called comm_size(..)]");
-        next_f(comm, size)
+        unsafe { next_f.unwrap()(comm, size) }
     }
-    fn comm_rank<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm, rank: *mut c_int) -> c_int
+    fn comm_rank<F>(&self, next_f: UnsafeBox<F>, comm: mpi_sys::MPI_Comm, rank: *mut c_int) -> c_int
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut c_int) -> c_int,
     {
         println!("[called comm_rank(..)]");
-        next_f(comm, rank)
+        unsafe { next_f.unwrap()(comm, rank) }
     }
     fn bcast<F>(
         &self,
-        next_f: F,
+        next_f: UnsafeBox<F>,
         buffer: *mut c_void,
         count: c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -47,21 +48,21 @@ impl MpiInterceptionLayer for MyQmpiLayer {
         F: FnOnce(*mut c_void, c_int, mpi_sys::MPI_Datatype, c_int, mpi_sys::MPI_Comm) -> c_int,
     {
         println!("[called bcast(..)]");
-        next_f(buffer, count, datatype, root, comm)
+        unsafe { next_f.unwrap()(buffer, count, datatype, root, comm) }
     }
-    fn barrier<F>(&self, next_f: F, comm: mpi_sys::MPI_Comm) -> c_int
+    fn barrier<F>(&self, next_f: UnsafeBox<F>, comm: mpi_sys::MPI_Comm) -> c_int
     where
         F: FnOnce(mpi_sys::MPI_Comm) -> c_int,
     {
         println!("[called barrier(..)]");
-        next_f(comm)
+        unsafe { next_f.unwrap()(comm) }
     }
-    fn finalize<F>(&self, next_f: F) -> c_int
+    fn finalize<F>(&self, next_f: UnsafeBox<F>) -> c_int
     where
         F: FnOnce() -> c_int,
     {
         println!("[called finalize(..)]");
-        next_f()
+        unsafe { next_f.unwrap()() }
     }
 }
 

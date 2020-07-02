@@ -1,12 +1,7 @@
-#![cfg(not(all(feature = "link_qmpi", feature = "link_mpi_test_tool")))]
-
 use std::{
     os::raw::{c_int, c_void},
     ptr,
 };
-
-#[cfg(feature = "link_qmpi")]
-use qmpi_sys::mpi_sys;
 
 use mpi_sys::{
     MPI_Barrier, MPI_Bcast, MPI_Comm_rank, MPI_Comm_size, MPI_Finalize, MPI_Init, MPI_Pcontrol,

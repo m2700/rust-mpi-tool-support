@@ -1,5 +1,5 @@
 [package]
-name = "mpi-tool-creator"
+name = "qmpi-tool-creator"
 version = "0.1.0"
 authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
 edition = "2018"
@@ -9,9 +9,5 @@ edition = "2018"
 
 [dependencies]
 # QMPI_Table_query and vector_get are double linked ("bundled" should not be here, but Rust can't do any better)
-qmpi-sys = { path = "../../sys/qmpi-sys", features = ["export_mpi", "bundled", "tool_mode"], optional = true }
-mpi-sys = { path = "../../sys/mpi-sys", features = ["mpi_functions", "link_mpi", "pmpi_tool_mode"], optional = true }
-
-[features]
-qmpi_mode = ["qmpi-sys"]
-pmpi_mode = ["mpi-sys"]
+qmpi-sys = { path = "../../sys/qmpi-sys", features = ["export_mpi", "bundled", "tool_mode"] }
+mpi-tool-layer = { path = "../mpi-tool-layer" }
