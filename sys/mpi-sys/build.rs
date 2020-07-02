@@ -410,7 +410,7 @@ const MPI_FUNCTIONS: [&str; 360] = [
     "MPI_Wtick",
     "MPI_Wtime",
 ];
-const MPI_VARS: [&str; 20] = [
+const MPI_VARS: [&str; 30] = [
     "RUST_MPI_CHAR",
     "RUST_MPI_SIGNED_CHAR",
     "RUST_MPI_UNSIGNED_CHAR",
@@ -431,6 +431,16 @@ const MPI_VARS: [&str; 20] = [
     "RUST_MPI_COMM_NULL",
     "RUST_MPI_COMM_WORLD",
     "RUST_MPI_COMM_SELF",
+    "RUST_C_BOOL",
+    "RUST_INT8_T",
+    "RUST_INT16_T",
+    "RUST_INT32_T",
+    "RUST_INT64_T",
+    "RUST_UINT8_T",
+    "RUST_UINT16_T",
+    "RUST_UINT32_T",
+    "RUST_UINT64_T",
+    "RUST_MPI_SUCCESS",
 ];
 
 fn main() {
@@ -483,7 +493,7 @@ fn main() {
         #[cfg(feature = "mpi_functions")]
         for &mpi_function in &MPI_FUNCTIONS[..] {
             mpi_bindings = mpi_bindings.whitelist_function(mpi_function);
-            #[cfg(feature = "pmpi_tool_mode")]
+            #[cfg(feature = "tool_mode")]
             {
                 mpi_bindings = mpi_bindings.whitelist_function("P".to_string() + mpi_function);
             }

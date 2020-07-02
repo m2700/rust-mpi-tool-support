@@ -7,12 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mpi-sys = { path = "../mpi-sys" }
+mpi-sys = { path = "../mpi-sys", features = ["mpi_functions"] }
 
 [features]
-# expose MPI_* functions
-mpi_functions = ["mpi-sys/mpi_functions"]
 # link against mpi and therefore expose all mpi functions
 link_mpi = ["mpi-sys/link_mpi"]
 # remap PMPI_* functions as MPI_*
-pmpi_tool_mode = ["mpi-sys/pmpi_tool_mode"]
+tool_mode = ["mpi-sys/tool_mode"]

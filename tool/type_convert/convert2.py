@@ -96,7 +96,7 @@ f"fn {self.function_ident}\
 
         return \
 f"#[inline] fn {mpiless_func_ident.lower()}\
-<F>(&self, next_f: UnsafeBox<F>, \
+<F>(next_f: UnsafeBox<F>, \
 {mcr_arg_ret_line_cont} \
 where F: FnOnce({types_joined}) -> {return_type} \
 {{ unsafe{{ next_f.unwrap()({arg_ids_joined}) }} }}"

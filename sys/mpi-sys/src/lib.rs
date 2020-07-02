@@ -15,16 +15,20 @@ mod types_and_consts {
         MPI_Group, MPI_Handler_function, MPI_Info, MPI_Message, MPI_Offset, MPI_Op, MPI_Request,
         MPI_Status, MPI_Type_copy_attr_function, MPI_Type_delete_attr_function, MPI_User_function,
         MPI_Win, MPI_Win_copy_attr_function, MPI_Win_delete_attr_function,
-        MPI_Win_errhandler_function, RUST_MPI_BYTE as MPI_BYTE, RUST_MPI_CHAR as MPI_CHAR,
-        RUST_MPI_COMM_NULL as MPI_COMM_NULL, RUST_MPI_COMM_SELF as MPI_COMM_SELF,
-        RUST_MPI_COMM_WORLD as MPI_COMM_WORLD, RUST_MPI_DOUBLE as MPI_DOUBLE,
-        RUST_MPI_FLOAT as MPI_FLOAT, RUST_MPI_INT as MPI_INT, RUST_MPI_LONG as MPI_LONG,
-        RUST_MPI_LONG_DOUBLE as MPI_LONG_DOUBLE, RUST_MPI_LONG_LONG as MPI_LONG_LONG,
-        RUST_MPI_LONG_LONG_INT as MPI_LONG_LONG_INT, RUST_MPI_SHORT as MPI_SHORT,
-        RUST_MPI_SIGNED_CHAR as MPI_SIGNED_CHAR, RUST_MPI_UNSIGNED as MPI_UNSIGNED,
+        MPI_Win_errhandler_function, RUST_C_BOOL as MPI_C_BOOL, RUST_INT16_T as MPI_INT16_T,
+        RUST_INT32_T as MPI_INT32_T, RUST_INT64_T as MPI_INT64_T, RUST_INT8_T as MPI_INT8_T,
+        RUST_MPI_BYTE as MPI_BYTE, RUST_MPI_CHAR as MPI_CHAR, RUST_MPI_COMM_NULL as MPI_COMM_NULL,
+        RUST_MPI_COMM_SELF as MPI_COMM_SELF, RUST_MPI_COMM_WORLD as MPI_COMM_WORLD,
+        RUST_MPI_DOUBLE as MPI_DOUBLE, RUST_MPI_FLOAT as MPI_FLOAT, RUST_MPI_INT as MPI_INT,
+        RUST_MPI_LONG as MPI_LONG, RUST_MPI_LONG_DOUBLE as MPI_LONG_DOUBLE,
+        RUST_MPI_LONG_LONG as MPI_LONG_LONG, RUST_MPI_LONG_LONG_INT as MPI_LONG_LONG_INT,
+        RUST_MPI_SHORT as MPI_SHORT, RUST_MPI_SIGNED_CHAR as MPI_SIGNED_CHAR,
+        RUST_MPI_SUCCESS as MPI_SUCCESS, RUST_MPI_UNSIGNED as MPI_UNSIGNED,
         RUST_MPI_UNSIGNED_CHAR as MPI_UNSIGNED_CHAR, RUST_MPI_UNSIGNED_LONG as MPI_UNSIGNED_LONG,
         RUST_MPI_UNSIGNED_LONG_LONG as MPI_UNSIGNED_LONG_LONG,
         RUST_MPI_UNSIGNED_SHORT as MPI_UNSIGNED_SHORT, RUST_MPI_WCHAR as MPI_WCHAR,
+        RUST_UINT16_T as MPI_UINT16_T, RUST_UINT32_T as MPI_UINT32_T,
+        RUST_UINT64_T as MPI_UINT64_T, RUST_UINT8_T as MPI_UINT8_T,
     };
 }
 pub use types_and_consts::*;
@@ -111,7 +115,7 @@ pub use c_mpi::{
     MPI_Win_unlock_all, MPI_Win_wait, MPI_Wtick, MPI_Wtime,
 };
 
-#[cfg(all(feature = "mpi_functions", feature = "pmpi_tool_mode"))]
+#[cfg(all(feature = "mpi_functions", feature = "tool_mode"))]
 pub mod pmpi {
     pub use crate::c_mpi::{
         PMPI_Abort as MPI_Abort, PMPI_Accumulate as MPI_Accumulate,

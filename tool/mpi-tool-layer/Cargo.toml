@@ -9,6 +9,7 @@ edition = "2018"
 
 [dependencies]
 mpi-sys = { path = "../../sys/mpi-sys", features = [] }
+rmpi = { path = "../../sys/rmpi", features = ["tool_mode"], optional = true }
 
 [features]
-rmpi = []
+rmpi_support = ["rmpi"]

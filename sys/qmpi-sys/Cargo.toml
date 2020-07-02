@@ -20,5 +20,5 @@ cc = { version = "*", optional = true }
 [features]
 export_mpi = ["mpi-sys"]
 bundled = ["cc", "mpi-sys", "mpi-sys/mpi_functions"]
-tool_mode = ["mpi-sys", "mpi-sys/mpi_functions", "mpi-sys/pmpi_tool_mode", "link_mpi"]
+tool_mode = ["mpi-sys", "mpi-sys/mpi_functions", "mpi-sys/tool_mode", "link_mpi"]
 link_mpi = ["mpi-sys", "mpi-sys/link_mpi"]

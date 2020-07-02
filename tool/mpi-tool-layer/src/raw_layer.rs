@@ -10,7 +10,6 @@ impl<T> UnsafeBox<T> {
 pub trait RawMpiInterceptionLayer {
     #[inline]
     fn send<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -33,7 +32,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn recv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -58,7 +56,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_count<F>(
-        &self,
         next_f: UnsafeBox<F>,
         status: *const mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
@@ -75,7 +72,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn bsend<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -98,7 +94,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ssend<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -121,7 +116,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn rsend<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -144,7 +138,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn buffer_attach<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buffer: *mut ::std::os::raw::c_void,
         size: ::std::os::raw::c_int,
@@ -156,7 +149,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn buffer_detach<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buffer_addr: *mut ::std::os::raw::c_void,
         size: *mut ::std::os::raw::c_int,
@@ -168,7 +160,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn isend<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -193,7 +184,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ibsend<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -218,7 +208,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn issend<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -243,7 +232,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn irsend<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -268,7 +256,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn irecv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -293,7 +280,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn wait<F>(
-        &self,
         next_f: UnsafeBox<F>,
         request: *mut mpi_sys::MPI_Request,
         status: *mut mpi_sys::MPI_Status,
@@ -305,7 +291,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn test<F>(
-        &self,
         next_f: UnsafeBox<F>,
         request: *mut mpi_sys::MPI_Request,
         flag: *mut ::std::os::raw::c_int,
@@ -322,7 +307,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn request_free<F>(
-        &self,
         next_f: UnsafeBox<F>,
         request: *mut mpi_sys::MPI_Request,
     ) -> ::std::os::raw::c_int
@@ -333,7 +317,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn waitany<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
@@ -352,7 +335,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn testany<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
@@ -373,7 +355,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn waitall<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
@@ -390,7 +371,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn testall<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
@@ -409,7 +389,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn waitsome<F>(
-        &self,
         next_f: UnsafeBox<F>,
         incount: ::std::os::raw::c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
@@ -438,7 +417,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn testsome<F>(
-        &self,
         next_f: UnsafeBox<F>,
         incount: ::std::os::raw::c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
@@ -467,7 +445,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iprobe<F>(
-        &self,
         next_f: UnsafeBox<F>,
         source: ::std::os::raw::c_int,
         tag: ::std::os::raw::c_int,
@@ -488,7 +465,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn probe<F>(
-        &self,
         next_f: UnsafeBox<F>,
         source: ::std::os::raw::c_int,
         tag: ::std::os::raw::c_int,
@@ -506,11 +482,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(source, tag, comm, status) }
     }
     #[inline]
-    fn cancel<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        request: *mut mpi_sys::MPI_Request,
-    ) -> ::std::os::raw::c_int
+    fn cancel<F>(next_f: UnsafeBox<F>, request: *mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
@@ -518,7 +490,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn test_cancelled<F>(
-        &self,
         next_f: UnsafeBox<F>,
         status: *const mpi_sys::MPI_Status,
         flag: *mut ::std::os::raw::c_int,
@@ -530,7 +501,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn send_init<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -555,7 +525,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn bsend_init<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -580,7 +549,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ssend_init<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -605,7 +573,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn rsend_init<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *const ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -630,7 +597,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn recv_init<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -654,11 +620,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(buf, count, datatype, source, tag, comm, request) }
     }
     #[inline]
-    fn start<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        request: *mut mpi_sys::MPI_Request,
-    ) -> ::std::os::raw::c_int
+    fn start<F>(next_f: UnsafeBox<F>, request: *mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
@@ -666,7 +628,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn startall<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_requests: *mut mpi_sys::MPI_Request,
@@ -678,7 +639,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn sendrecv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -718,7 +678,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn sendrecv_replace<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -751,7 +710,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_contiguous<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         oldtype: mpi_sys::MPI_Datatype,
@@ -768,7 +726,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_vector<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         blocklength: ::std::os::raw::c_int,
@@ -789,7 +746,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_hvector<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         blocklength: ::std::os::raw::c_int,
@@ -810,7 +766,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_indexed<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_blocklengths: *const ::std::os::raw::c_int,
@@ -839,7 +794,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_hindexed<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_blocklengths: *mut ::std::os::raw::c_int,
@@ -868,7 +822,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_struct<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_blocklengths: *mut ::std::os::raw::c_int,
@@ -897,7 +850,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn address<F>(
-        &self,
         next_f: UnsafeBox<F>,
         location: *mut ::std::os::raw::c_void,
         address: *mut mpi_sys::MPI_Aint,
@@ -909,7 +861,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_extent<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         extent: *mut mpi_sys::MPI_Aint,
@@ -921,7 +872,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         size: *mut ::std::os::raw::c_int,
@@ -933,7 +883,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_lb<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         displacement: *mut mpi_sys::MPI_Aint,
@@ -945,7 +894,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_ub<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         displacement: *mut mpi_sys::MPI_Aint,
@@ -957,7 +905,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_commit<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: *mut mpi_sys::MPI_Datatype,
     ) -> ::std::os::raw::c_int
@@ -968,7 +915,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_free<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: *mut mpi_sys::MPI_Datatype,
     ) -> ::std::os::raw::c_int
@@ -979,7 +925,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_elements<F>(
-        &self,
         next_f: UnsafeBox<F>,
         status: *const mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
@@ -996,7 +941,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn pack<F>(
-        &self,
         next_f: UnsafeBox<F>,
         inbuf: *const ::std::os::raw::c_void,
         incount: ::std::os::raw::c_int,
@@ -1021,7 +965,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn unpack<F>(
-        &self,
         next_f: UnsafeBox<F>,
         inbuf: *const ::std::os::raw::c_void,
         insize: ::std::os::raw::c_int,
@@ -1046,7 +989,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn pack_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         incount: ::std::os::raw::c_int,
         datatype: mpi_sys::MPI_Datatype,
@@ -1064,7 +1006,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(incount, datatype, comm, size) }
     }
     #[inline]
-    fn barrier<F>(&self, next_f: UnsafeBox<F>, comm: mpi_sys::MPI_Comm) -> ::std::os::raw::c_int
+    fn barrier<F>(next_f: UnsafeBox<F>, comm: mpi_sys::MPI_Comm) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
@@ -1072,7 +1014,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn bcast<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buffer: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -1093,7 +1034,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn gather<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -1124,7 +1064,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn gatherv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -1157,7 +1096,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn scatter<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -1188,7 +1126,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn scatterv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -1221,7 +1158,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn allgather<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -1250,7 +1186,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn allgatherv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -1281,7 +1216,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn alltoall<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -1310,7 +1244,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn alltoallv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -1344,7 +1277,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn alltoallw<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -1378,7 +1310,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn exscan<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -1401,7 +1332,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn reduce<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -1426,7 +1356,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn op_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         user_fn: mpi_sys::MPI_User_function,
         commute: ::std::os::raw::c_int,
@@ -1442,7 +1371,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(user_fn, commute, op) }
     }
     #[inline]
-    fn op_free<F>(&self, next_f: UnsafeBox<F>, op: *mut mpi_sys::MPI_Op) -> ::std::os::raw::c_int
+    fn op_free<F>(next_f: UnsafeBox<F>, op: *mut mpi_sys::MPI_Op) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Op) -> ::std::os::raw::c_int,
     {
@@ -1450,7 +1379,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn allreduce<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -1473,7 +1401,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn reduce_scatter<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -1496,7 +1423,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn scan<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -1519,7 +1445,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         size: *mut ::std::os::raw::c_int,
@@ -1531,7 +1456,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_rank<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         rank: *mut ::std::os::raw::c_int,
@@ -1543,7 +1467,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_translate_ranks<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group1: mpi_sys::MPI_Group,
         n: ::std::os::raw::c_int,
@@ -1564,7 +1487,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_compare<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
@@ -1581,7 +1503,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_group<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         group: *mut mpi_sys::MPI_Group,
@@ -1593,7 +1514,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_union<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
@@ -1610,7 +1530,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_intersection<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
@@ -1627,7 +1546,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_difference<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group1: mpi_sys::MPI_Group,
         group2: mpi_sys::MPI_Group,
@@ -1644,7 +1562,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_incl<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         n: ::std::os::raw::c_int,
@@ -1663,7 +1580,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_excl<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         n: ::std::os::raw::c_int,
@@ -1682,7 +1598,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_range_incl<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         n: ::std::os::raw::c_int,
@@ -1701,7 +1616,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn group_range_excl<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         n: ::std::os::raw::c_int,
@@ -1719,11 +1633,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(group, n, ranges, newgroup) }
     }
     #[inline]
-    fn group_free<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        group: *mut mpi_sys::MPI_Group,
-    ) -> ::std::os::raw::c_int
+    fn group_free<F>(next_f: UnsafeBox<F>, group: *mut mpi_sys::MPI_Group) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Group) -> ::std::os::raw::c_int,
     {
@@ -1731,7 +1641,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         size: *mut ::std::os::raw::c_int,
@@ -1743,7 +1652,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_rank<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         rank: *mut ::std::os::raw::c_int,
@@ -1755,7 +1663,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_compare<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm1: mpi_sys::MPI_Comm,
         comm2: mpi_sys::MPI_Comm,
@@ -1772,7 +1679,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_dup<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         newcomm: *mut mpi_sys::MPI_Comm,
@@ -1784,7 +1690,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_dup_with_info<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         info: mpi_sys::MPI_Info,
@@ -1801,7 +1706,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         group: mpi_sys::MPI_Group,
@@ -1818,7 +1722,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_split<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         color: ::std::os::raw::c_int,
@@ -1836,11 +1739,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(comm, color, key, newcomm) }
     }
     #[inline]
-    fn comm_free<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        comm: *mut mpi_sys::MPI_Comm,
-    ) -> ::std::os::raw::c_int
+    fn comm_free<F>(next_f: UnsafeBox<F>, comm: *mut mpi_sys::MPI_Comm) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
@@ -1848,7 +1747,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_test_inter<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         flag: *mut ::std::os::raw::c_int,
@@ -1860,7 +1758,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_remote_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         size: *mut ::std::os::raw::c_int,
@@ -1872,7 +1769,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_remote_group<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         group: *mut mpi_sys::MPI_Group,
@@ -1884,7 +1780,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn intercomm_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         local_comm: mpi_sys::MPI_Comm,
         local_leader: ::std::os::raw::c_int,
@@ -1916,7 +1811,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn intercomm_merge<F>(
-        &self,
         next_f: UnsafeBox<F>,
         intercomm: mpi_sys::MPI_Comm,
         high: ::std::os::raw::c_int,
@@ -1933,7 +1827,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn keyval_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         copy_fn: mpi_sys::MPI_Copy_function,
         delete_fn: mpi_sys::MPI_Delete_function,
@@ -1952,7 +1845,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn keyval_free<F>(
-        &self,
         next_f: UnsafeBox<F>,
         keyval: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -1963,7 +1855,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn attr_put<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         keyval: ::std::os::raw::c_int,
@@ -1980,7 +1871,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn attr_get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         keyval: ::std::os::raw::c_int,
@@ -1999,7 +1889,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn attr_delete<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         keyval: ::std::os::raw::c_int,
@@ -2011,7 +1900,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn topo_test<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         status: *mut ::std::os::raw::c_int,
@@ -2023,7 +1911,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cart_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm_old: mpi_sys::MPI_Comm,
         ndims: ::std::os::raw::c_int,
@@ -2046,7 +1933,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn dims_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         nnodes: ::std::os::raw::c_int,
         ndims: ::std::os::raw::c_int,
@@ -2063,7 +1949,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn graph_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm_old: mpi_sys::MPI_Comm,
         nnodes: ::std::os::raw::c_int,
@@ -2086,7 +1971,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn graphdims_get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         nnodes: *mut ::std::os::raw::c_int,
@@ -2103,7 +1987,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn graph_get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         maxindex: ::std::os::raw::c_int,
@@ -2124,7 +2007,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cartdim_get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         ndims: *mut ::std::os::raw::c_int,
@@ -2136,7 +2018,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cart_get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         maxdims: ::std::os::raw::c_int,
@@ -2157,7 +2038,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cart_rank<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         coords: *const ::std::os::raw::c_int,
@@ -2174,7 +2054,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cart_coords<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         rank: ::std::os::raw::c_int,
@@ -2193,7 +2072,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn graph_neighbors_count<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         rank: ::std::os::raw::c_int,
@@ -2210,7 +2088,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn graph_neighbors<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         rank: ::std::os::raw::c_int,
@@ -2229,7 +2106,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cart_shift<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         direction: ::std::os::raw::c_int,
@@ -2250,7 +2126,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cart_sub<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         remain_dims: *const ::std::os::raw::c_int,
@@ -2267,7 +2142,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn cart_map<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         ndims: ::std::os::raw::c_int,
@@ -2288,7 +2162,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn graph_map<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         nnodes: ::std::os::raw::c_int,
@@ -2309,7 +2182,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_processor_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         name: *mut ::std::os::raw::c_char,
         resultlen: *mut ::std::os::raw::c_int,
@@ -2321,7 +2193,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_version<F>(
-        &self,
         next_f: UnsafeBox<F>,
         version: *mut ::std::os::raw::c_int,
         subversion: *mut ::std::os::raw::c_int,
@@ -2333,7 +2204,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_library_version<F>(
-        &self,
         next_f: UnsafeBox<F>,
         version: *mut ::std::os::raw::c_char,
         resultlen: *mut ::std::os::raw::c_int,
@@ -2345,7 +2215,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn errhandler_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         function: mpi_sys::MPI_Handler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -2360,7 +2229,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn errhandler_set<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         errhandler: mpi_sys::MPI_Errhandler,
@@ -2372,7 +2240,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn errhandler_get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -2384,7 +2251,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn errhandler_free<F>(
-        &self,
         next_f: UnsafeBox<F>,
         errhandler: *mut mpi_sys::MPI_Errhandler,
     ) -> ::std::os::raw::c_int
@@ -2395,7 +2261,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn error_string<F>(
-        &self,
         next_f: UnsafeBox<F>,
         errorcode: ::std::os::raw::c_int,
         string: *mut ::std::os::raw::c_char,
@@ -2412,7 +2277,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn error_class<F>(
-        &self,
         next_f: UnsafeBox<F>,
         errorcode: ::std::os::raw::c_int,
         errorclass: *mut ::std::os::raw::c_int,
@@ -2423,14 +2287,14 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(errorcode, errorclass) }
     }
     #[inline]
-    fn wtime<F>(&self, next_f: UnsafeBox<F>) -> f64
+    fn wtime<F>(next_f: UnsafeBox<F>) -> f64
     where
         F: FnOnce() -> f64,
     {
         unsafe { next_f.unwrap()() }
     }
     #[inline]
-    fn wtick<F>(&self, next_f: UnsafeBox<F>) -> f64
+    fn wtick<F>(next_f: UnsafeBox<F>) -> f64
     where
         F: FnOnce() -> f64,
     {
@@ -2438,7 +2302,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn init<F>(
-        &self,
         next_f: UnsafeBox<F>,
         argc: *mut ::std::os::raw::c_int,
         argv: *mut *mut *mut ::std::os::raw::c_char,
@@ -2452,7 +2315,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(argc, argv) }
     }
     #[inline]
-    fn finalize<F>(&self, next_f: UnsafeBox<F>) -> ::std::os::raw::c_int
+    fn finalize<F>(next_f: UnsafeBox<F>) -> ::std::os::raw::c_int
     where
         F: FnOnce() -> ::std::os::raw::c_int,
     {
@@ -2460,7 +2323,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn initialized<F>(
-        &self,
         next_f: UnsafeBox<F>,
         flag: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -2471,7 +2333,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn abort<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         errorcode: ::std::os::raw::c_int,
@@ -2482,11 +2343,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(comm, errorcode) }
     }
     #[inline]
-    fn pcontrol<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        level: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int
+    fn pcontrol<F>(next_f: UnsafeBox<F>, level: ::std::os::raw::c_int) -> ::std::os::raw::c_int
     where
         F: FnOnce(::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
@@ -2494,7 +2351,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn close_port<F>(
-        &self,
         next_f: UnsafeBox<F>,
         port_name: *const ::std::os::raw::c_char,
     ) -> ::std::os::raw::c_int
@@ -2505,7 +2361,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_accept<F>(
-        &self,
         next_f: UnsafeBox<F>,
         port_name: *const ::std::os::raw::c_char,
         info: mpi_sys::MPI_Info,
@@ -2526,7 +2381,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_connect<F>(
-        &self,
         next_f: UnsafeBox<F>,
         port_name: *const ::std::os::raw::c_char,
         info: mpi_sys::MPI_Info,
@@ -2547,7 +2401,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_disconnect<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: *mut mpi_sys::MPI_Comm,
     ) -> ::std::os::raw::c_int
@@ -2558,7 +2411,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_get_parent<F>(
-        &self,
         next_f: UnsafeBox<F>,
         parent: *mut mpi_sys::MPI_Comm,
     ) -> ::std::os::raw::c_int
@@ -2569,7 +2421,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_join<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fd: ::std::os::raw::c_int,
         intercomm: *mut mpi_sys::MPI_Comm,
@@ -2581,7 +2432,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn lookup_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         service_name: *const ::std::os::raw::c_char,
         info: mpi_sys::MPI_Info,
@@ -2598,7 +2448,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn open_port<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         port_name: *mut ::std::os::raw::c_char,
@@ -2610,7 +2459,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn publish_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         service_name: *const ::std::os::raw::c_char,
         info: mpi_sys::MPI_Info,
@@ -2627,7 +2475,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn unpublish_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         service_name: *const ::std::os::raw::c_char,
         info: mpi_sys::MPI_Info,
@@ -2644,7 +2491,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_set_info<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         info: mpi_sys::MPI_Info,
@@ -2656,7 +2502,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_get_info<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         info: *mut mpi_sys::MPI_Info,
@@ -2668,7 +2513,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn accumulate<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -2709,7 +2553,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *mut ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -2747,7 +2590,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn put<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -2784,7 +2626,7 @@ pub trait RawMpiInterceptionLayer {
         }
     }
     #[inline]
-    fn win_complete<F>(&self, next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
+    fn win_complete<F>(next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
@@ -2792,7 +2634,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         base: *mut ::std::os::raw::c_void,
         size: mpi_sys::MPI_Aint,
@@ -2815,7 +2656,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_fence<F>(
-        &self,
         next_f: UnsafeBox<F>,
         assert: ::std::os::raw::c_int,
         win: mpi_sys::MPI_Win,
@@ -2826,7 +2666,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(assert, win) }
     }
     #[inline]
-    fn win_free<F>(&self, next_f: UnsafeBox<F>, win: *mut mpi_sys::MPI_Win) -> ::std::os::raw::c_int
+    fn win_free<F>(next_f: UnsafeBox<F>, win: *mut mpi_sys::MPI_Win) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
@@ -2834,7 +2674,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_get_group<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         group: *mut mpi_sys::MPI_Group,
@@ -2846,7 +2685,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_lock<F>(
-        &self,
         next_f: UnsafeBox<F>,
         lock_type: ::std::os::raw::c_int,
         rank: ::std::os::raw::c_int,
@@ -2865,7 +2703,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_post<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         assert: ::std::os::raw::c_int,
@@ -2882,7 +2719,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_start<F>(
-        &self,
         next_f: UnsafeBox<F>,
         group: mpi_sys::MPI_Group,
         assert: ::std::os::raw::c_int,
@@ -2899,7 +2735,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_test<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         flag: *mut ::std::os::raw::c_int,
@@ -2911,7 +2746,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_unlock<F>(
-        &self,
         next_f: UnsafeBox<F>,
         rank: ::std::os::raw::c_int,
         win: mpi_sys::MPI_Win,
@@ -2922,7 +2756,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(rank, win) }
     }
     #[inline]
-    fn win_wait<F>(&self, next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
+    fn win_wait<F>(next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
@@ -2930,7 +2764,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_allocate<F>(
-        &self,
         next_f: UnsafeBox<F>,
         size: mpi_sys::MPI_Aint,
         disp_unit: ::std::os::raw::c_int,
@@ -2953,7 +2786,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_allocate_shared<F>(
-        &self,
         next_f: UnsafeBox<F>,
         size: mpi_sys::MPI_Aint,
         disp_unit: ::std::os::raw::c_int,
@@ -2976,7 +2808,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_shared_query<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         rank: ::std::os::raw::c_int,
@@ -2997,7 +2828,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_create_dynamic<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         comm: mpi_sys::MPI_Comm,
@@ -3014,7 +2844,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_attach<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         base: *mut ::std::os::raw::c_void,
@@ -3031,7 +2860,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_detach<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         base: *const ::std::os::raw::c_void,
@@ -3043,7 +2871,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_get_info<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         info_used: *mut mpi_sys::MPI_Info,
@@ -3055,7 +2882,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_set_info<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         info: mpi_sys::MPI_Info,
@@ -3067,7 +2893,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_accumulate<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -3117,7 +2942,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn fetch_and_op<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         result_addr: *mut ::std::os::raw::c_void,
@@ -3152,7 +2976,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn compare_and_swap<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         compare_addr: *const ::std::os::raw::c_void,
@@ -3187,7 +3010,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn rput<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -3228,7 +3050,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn rget<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *mut ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -3269,7 +3090,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn raccumulate<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -3313,7 +3133,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn rget_accumulate<F>(
-        &self,
         next_f: UnsafeBox<F>,
         origin_addr: *const ::std::os::raw::c_void,
         origin_count: ::std::os::raw::c_int,
@@ -3366,7 +3185,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_lock_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         assert: ::std::os::raw::c_int,
         win: mpi_sys::MPI_Win,
@@ -3377,11 +3195,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(assert, win) }
     }
     #[inline]
-    fn win_unlock_all<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        win: mpi_sys::MPI_Win,
-    ) -> ::std::os::raw::c_int
+    fn win_unlock_all<F>(next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
@@ -3389,7 +3203,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_flush<F>(
-        &self,
         next_f: UnsafeBox<F>,
         rank: ::std::os::raw::c_int,
         win: mpi_sys::MPI_Win,
@@ -3400,7 +3213,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(rank, win) }
     }
     #[inline]
-    fn win_flush_all<F>(&self, next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
+    fn win_flush_all<F>(next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
@@ -3408,7 +3221,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_flush_local<F>(
-        &self,
         next_f: UnsafeBox<F>,
         rank: ::std::os::raw::c_int,
         win: mpi_sys::MPI_Win,
@@ -3419,18 +3231,14 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(rank, win) }
     }
     #[inline]
-    fn win_flush_local_all<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        win: mpi_sys::MPI_Win,
-    ) -> ::std::os::raw::c_int
+    fn win_flush_local_all<F>(next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
-    fn win_sync<F>(&self, next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
+    fn win_sync<F>(next_f: UnsafeBox<F>, win: mpi_sys::MPI_Win) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
@@ -3438,7 +3246,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn add_error_class<F>(
-        &self,
         next_f: UnsafeBox<F>,
         errorclass: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -3449,7 +3256,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn add_error_code<F>(
-        &self,
         next_f: UnsafeBox<F>,
         errorclass: ::std::os::raw::c_int,
         errorcode: *mut ::std::os::raw::c_int,
@@ -3461,7 +3267,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn add_error_string<F>(
-        &self,
         next_f: UnsafeBox<F>,
         errorcode: ::std::os::raw::c_int,
         string: *const ::std::os::raw::c_char,
@@ -3473,7 +3278,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_call_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         errorcode: ::std::os::raw::c_int,
@@ -3485,7 +3289,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_create_keyval<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm_copy_attr_fn: mpi_sys::MPI_Comm_copy_attr_function,
         comm_delete_attr_fn: mpi_sys::MPI_Comm_delete_attr_function,
@@ -3511,7 +3314,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_delete_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         comm_keyval: ::std::os::raw::c_int,
@@ -3523,7 +3325,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_free_keyval<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm_keyval: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -3534,7 +3335,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_get_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         comm_keyval: ::std::os::raw::c_int,
@@ -3553,7 +3353,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_get_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         comm_name: *mut ::std::os::raw::c_char,
@@ -3570,7 +3369,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_set_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         comm_keyval: ::std::os::raw::c_int,
@@ -3587,7 +3385,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_set_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         comm_name: *const ::std::os::raw::c_char,
@@ -3599,7 +3396,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_call_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         errorcode: ::std::os::raw::c_int,
@@ -3611,7 +3407,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn grequest_complete<F>(
-        &self,
         next_f: UnsafeBox<F>,
         request: mpi_sys::MPI_Request,
     ) -> ::std::os::raw::c_int
@@ -3622,7 +3417,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn grequest_start<F>(
-        &self,
         next_f: UnsafeBox<F>,
         query_fn: mpi_sys::MPI_Grequest_query_function,
         free_fn: mpi_sys::MPI_Grequest_free_function,
@@ -3643,7 +3437,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn init_thread<F>(
-        &self,
         next_f: UnsafeBox<F>,
         argc: *mut ::std::os::raw::c_int,
         argv: *mut *mut *mut ::std::os::raw::c_char,
@@ -3662,7 +3455,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn is_thread_main<F>(
-        &self,
         next_f: UnsafeBox<F>,
         flag: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -3673,7 +3465,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn query_thread<F>(
-        &self,
         next_f: UnsafeBox<F>,
         provided: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -3684,7 +3475,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn status_set_cancelled<F>(
-        &self,
         next_f: UnsafeBox<F>,
         status: *mut mpi_sys::MPI_Status,
         flag: ::std::os::raw::c_int,
@@ -3696,7 +3486,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn status_set_elements<F>(
-        &self,
         next_f: UnsafeBox<F>,
         status: *mut mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
@@ -3713,7 +3502,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_keyval<F>(
-        &self,
         next_f: UnsafeBox<F>,
         type_copy_attr_fn: mpi_sys::MPI_Type_copy_attr_function,
         type_delete_attr_fn: mpi_sys::MPI_Type_delete_attr_function,
@@ -3739,7 +3527,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_delete_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         type_keyval: ::std::os::raw::c_int,
@@ -3751,7 +3538,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_dup<F>(
-        &self,
         next_f: UnsafeBox<F>,
         oldtype: mpi_sys::MPI_Datatype,
         newtype: *mut mpi_sys::MPI_Datatype,
@@ -3763,7 +3549,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_free_keyval<F>(
-        &self,
         next_f: UnsafeBox<F>,
         type_keyval: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -3774,7 +3559,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         type_keyval: ::std::os::raw::c_int,
@@ -3793,7 +3577,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_contents<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         max_integers: ::std::os::raw::c_int,
@@ -3828,7 +3611,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_envelope<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         num_integers: *mut ::std::os::raw::c_int,
@@ -3857,7 +3639,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         type_name: *mut ::std::os::raw::c_char,
@@ -3874,7 +3655,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_set_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         type_keyval: ::std::os::raw::c_int,
@@ -3891,7 +3671,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_set_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         type_name: *const ::std::os::raw::c_char,
@@ -3903,7 +3682,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_match_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         typeclass: ::std::os::raw::c_int,
         size: ::std::os::raw::c_int,
@@ -3920,7 +3698,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_call_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         errorcode: ::std::os::raw::c_int,
@@ -3932,7 +3709,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_create_keyval<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win_copy_attr_fn: mpi_sys::MPI_Win_copy_attr_function,
         win_delete_attr_fn: mpi_sys::MPI_Win_delete_attr_function,
@@ -3958,7 +3734,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_delete_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         win_keyval: ::std::os::raw::c_int,
@@ -3970,7 +3745,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_free_keyval<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win_keyval: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int
@@ -3981,7 +3755,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_get_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         win_keyval: ::std::os::raw::c_int,
@@ -4000,7 +3773,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_get_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         win_name: *mut ::std::os::raw::c_char,
@@ -4017,7 +3789,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_set_attr<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         win_keyval: ::std::os::raw::c_int,
@@ -4034,7 +3805,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_set_name<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         win_name: *const ::std::os::raw::c_char,
@@ -4046,7 +3816,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn alloc_mem<F>(
-        &self,
         next_f: UnsafeBox<F>,
         size: mpi_sys::MPI_Aint,
         info: mpi_sys::MPI_Info,
@@ -4063,7 +3832,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_create_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm_errhandler_fn: mpi_sys::MPI_Comm_errhandler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -4078,7 +3846,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_get_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -4090,7 +3857,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_set_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         errhandler: mpi_sys::MPI_Errhandler,
@@ -4102,7 +3868,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_create_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         file_errhandler_fn: mpi_sys::MPI_File_errhandler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -4117,7 +3882,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         file: mpi_sys::MPI_File,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -4129,7 +3893,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_set_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         file: mpi_sys::MPI_File,
         errhandler: mpi_sys::MPI_Errhandler,
@@ -4140,22 +3903,14 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(file, errhandler) }
     }
     #[inline]
-    fn finalized<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        flag: *mut ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int
+    fn finalized<F>(next_f: UnsafeBox<F>, flag: *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
         unsafe { next_f.unwrap()(flag) }
     }
     #[inline]
-    fn free_mem<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        base: *mut ::std::os::raw::c_void,
-    ) -> ::std::os::raw::c_int
+    fn free_mem<F>(next_f: UnsafeBox<F>, base: *mut ::std::os::raw::c_void) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut ::std::os::raw::c_void) -> ::std::os::raw::c_int,
     {
@@ -4163,7 +3918,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_address<F>(
-        &self,
         next_f: UnsafeBox<F>,
         location: *const ::std::os::raw::c_void,
         address: *mut mpi_sys::MPI_Aint,
@@ -4174,11 +3928,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(location, address) }
     }
     #[inline]
-    fn info_create<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        info: *mut mpi_sys::MPI_Info,
-    ) -> ::std::os::raw::c_int
+    fn info_create<F>(next_f: UnsafeBox<F>, info: *mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
@@ -4186,7 +3936,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn info_delete<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         key: *const ::std::os::raw::c_char,
@@ -4198,7 +3947,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn info_dup<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         newinfo: *mut mpi_sys::MPI_Info,
@@ -4209,11 +3957,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(info, newinfo) }
     }
     #[inline]
-    fn info_free<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        info: *mut mpi_sys::MPI_Info,
-    ) -> ::std::os::raw::c_int
+    fn info_free<F>(next_f: UnsafeBox<F>, info: *mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
@@ -4221,7 +3965,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn info_get<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         key: *const ::std::os::raw::c_char,
@@ -4242,7 +3985,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn info_get_nkeys<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         nkeys: *mut ::std::os::raw::c_int,
@@ -4254,7 +3996,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn info_get_nthkey<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         n: ::std::os::raw::c_int,
@@ -4271,7 +4012,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn info_get_valuelen<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         key: *const ::std::os::raw::c_char,
@@ -4290,7 +4030,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn info_set<F>(
-        &self,
         next_f: UnsafeBox<F>,
         info: mpi_sys::MPI_Info,
         key: *const ::std::os::raw::c_char,
@@ -4307,7 +4046,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn pack_external<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datarep: *const ::std::os::raw::c_char,
         inbuf: *const ::std::os::raw::c_void,
@@ -4332,7 +4070,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn pack_external_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datarep: *const ::std::os::raw::c_char,
         incount: ::std::os::raw::c_int,
@@ -4351,7 +4088,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn request_get_status<F>(
-        &self,
         next_f: UnsafeBox<F>,
         request: mpi_sys::MPI_Request,
         flag: *mut ::std::os::raw::c_int,
@@ -4368,7 +4104,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_darray<F>(
-        &self,
         next_f: UnsafeBox<F>,
         size: ::std::os::raw::c_int,
         rank: ::std::os::raw::c_int,
@@ -4412,7 +4147,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_hindexed<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_blocklengths: *const ::std::os::raw::c_int,
@@ -4441,7 +4175,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_hvector<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         blocklength: ::std::os::raw::c_int,
@@ -4462,7 +4195,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_indexed_block<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         blocklength: ::std::os::raw::c_int,
@@ -4483,7 +4215,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_hindexed_block<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         blocklength: ::std::os::raw::c_int,
@@ -4504,7 +4235,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_resized<F>(
-        &self,
         next_f: UnsafeBox<F>,
         oldtype: mpi_sys::MPI_Datatype,
         lb: mpi_sys::MPI_Aint,
@@ -4523,7 +4253,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_struct<F>(
-        &self,
         next_f: UnsafeBox<F>,
         count: ::std::os::raw::c_int,
         array_of_blocklengths: *const ::std::os::raw::c_int,
@@ -4552,7 +4281,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_subarray<F>(
-        &self,
         next_f: UnsafeBox<F>,
         ndims: ::std::os::raw::c_int,
         array_of_sizes: *const ::std::os::raw::c_int,
@@ -4587,7 +4315,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_extent<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         lb: *mut mpi_sys::MPI_Aint,
@@ -4604,7 +4331,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_true_extent<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         true_lb: *mut mpi_sys::MPI_Aint,
@@ -4621,7 +4347,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn unpack_external<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datarep: *const ::std::os::raw::c_char,
         inbuf: *const ::std::os::raw::c_void,
@@ -4646,7 +4371,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_create_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win_errhandler_fn: mpi_sys::MPI_Win_errhandler_function,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -4661,7 +4385,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_get_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         errhandler: *mut mpi_sys::MPI_Errhandler,
@@ -4673,7 +4396,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn win_set_errhandler<F>(
-        &self,
         next_f: UnsafeBox<F>,
         win: mpi_sys::MPI_Win,
         errhandler: mpi_sys::MPI_Errhandler,
@@ -4685,7 +4407,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_f90_integer<F>(
-        &self,
         next_f: UnsafeBox<F>,
         range: ::std::os::raw::c_int,
         newtype: *mut mpi_sys::MPI_Datatype,
@@ -4697,7 +4418,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_f90_real<F>(
-        &self,
         next_f: UnsafeBox<F>,
         precision: ::std::os::raw::c_int,
         range: ::std::os::raw::c_int,
@@ -4714,7 +4434,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_create_f90_complex<F>(
-        &self,
         next_f: UnsafeBox<F>,
         precision: ::std::os::raw::c_int,
         range: ::std::os::raw::c_int,
@@ -4731,7 +4450,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn reduce_local<F>(
-        &self,
         next_f: UnsafeBox<F>,
         inbuf: *const ::std::os::raw::c_void,
         inoutbuf: *mut ::std::os::raw::c_void,
@@ -4752,7 +4470,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn op_commutative<F>(
-        &self,
         next_f: UnsafeBox<F>,
         op: mpi_sys::MPI_Op,
         commute: *mut ::std::os::raw::c_int,
@@ -4764,7 +4481,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn reduce_scatter_block<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -4787,7 +4503,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn dist_graph_create_adjacent<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm_old: mpi_sys::MPI_Comm,
         indegree: ::std::os::raw::c_int,
@@ -4831,7 +4546,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn dist_graph_create<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm_old: mpi_sys::MPI_Comm,
         n: ::std::os::raw::c_int,
@@ -4872,7 +4586,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn dist_graph_neighbors_count<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         indegree: *mut ::std::os::raw::c_int,
@@ -4891,7 +4604,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn dist_graph_neighbors<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         maxindegree: ::std::os::raw::c_int,
@@ -4926,7 +4638,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn improbe<F>(
-        &self,
         next_f: UnsafeBox<F>,
         source: ::std::os::raw::c_int,
         tag: ::std::os::raw::c_int,
@@ -4949,7 +4660,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn imrecv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -4970,7 +4680,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn mprobe<F>(
-        &self,
         next_f: UnsafeBox<F>,
         source: ::std::os::raw::c_int,
         tag: ::std::os::raw::c_int,
@@ -4991,7 +4700,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn mrecv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buf: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -5012,7 +4720,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_idup<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         newcomm: *mut mpi_sys::MPI_Comm,
@@ -5029,7 +4736,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ibarrier<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         request: *mut mpi_sys::MPI_Request,
@@ -5041,7 +4747,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ibcast<F>(
-        &self,
         next_f: UnsafeBox<F>,
         buffer: *mut ::std::os::raw::c_void,
         count: ::std::os::raw::c_int,
@@ -5064,7 +4769,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn igather<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5097,7 +4801,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn igatherv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5133,7 +4836,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iscatter<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5166,7 +4868,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iscatterv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -5202,7 +4903,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iallgather<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5233,7 +4933,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iallgatherv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5266,7 +4965,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ialltoall<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5297,7 +4995,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ialltoallv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -5333,7 +5030,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ialltoallw<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -5369,7 +5065,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ireduce<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -5396,7 +5091,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iallreduce<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -5421,7 +5115,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ireduce_scatter<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -5446,7 +5139,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ireduce_scatter_block<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -5471,7 +5163,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iscan<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -5496,7 +5187,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn iexscan<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         recvbuf: *mut ::std::os::raw::c_void,
@@ -5521,7 +5211,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ineighbor_allgather<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5552,7 +5241,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ineighbor_allgatherv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5585,7 +5273,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ineighbor_alltoall<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5616,7 +5303,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ineighbor_alltoallv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -5652,7 +5338,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn ineighbor_alltoallw<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -5688,7 +5373,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn neighbor_allgather<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5717,7 +5401,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn neighbor_allgatherv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5748,7 +5431,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn neighbor_alltoall<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcount: ::std::os::raw::c_int,
@@ -5777,7 +5459,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn neighbor_alltoallv<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -5811,7 +5492,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn neighbor_alltoallw<F>(
-        &self,
         next_f: UnsafeBox<F>,
         sendbuf: *const ::std::os::raw::c_void,
         sendcounts: *const ::std::os::raw::c_int,
@@ -5845,7 +5525,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_split_type<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         split_type: ::std::os::raw::c_int,
@@ -5866,7 +5545,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn get_elements_x<F>(
-        &self,
         next_f: UnsafeBox<F>,
         status: *const mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
@@ -5883,7 +5561,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn status_set_elements_x<F>(
-        &self,
         next_f: UnsafeBox<F>,
         status: *mut mpi_sys::MPI_Status,
         datatype: mpi_sys::MPI_Datatype,
@@ -5900,7 +5577,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_extent_x<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         lb: *mut mpi_sys::MPI_Count,
@@ -5917,7 +5593,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_get_true_extent_x<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         lb: *mut mpi_sys::MPI_Count,
@@ -5934,7 +5609,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn type_size_x<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datatype: mpi_sys::MPI_Datatype,
         size: *mut mpi_sys::MPI_Count,
@@ -5946,7 +5620,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn comm_create_group<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         group: mpi_sys::MPI_Group,
@@ -5965,7 +5638,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_open<F>(
-        &self,
         next_f: UnsafeBox<F>,
         comm: mpi_sys::MPI_Comm,
         filename: *const ::std::os::raw::c_char,
@@ -5985,11 +5657,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(comm, filename, amode, info, fh) }
     }
     #[inline]
-    fn file_close<F>(
-        &self,
-        next_f: UnsafeBox<F>,
-        fh: *mut mpi_sys::MPI_File,
-    ) -> ::std::os::raw::c_int
+    fn file_close<F>(next_f: UnsafeBox<F>, fh: *mut mpi_sys::MPI_File) -> ::std::os::raw::c_int
     where
         F: FnOnce(*mut mpi_sys::MPI_File) -> ::std::os::raw::c_int,
     {
@@ -5997,7 +5665,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_delete<F>(
-        &self,
         next_f: UnsafeBox<F>,
         filename: *const ::std::os::raw::c_char,
         info: mpi_sys::MPI_Info,
@@ -6009,7 +5676,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_set_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         size: mpi_sys::MPI_Offset,
@@ -6021,7 +5687,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_preallocate<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         size: mpi_sys::MPI_Offset,
@@ -6033,7 +5698,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_size<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         size: *mut mpi_sys::MPI_Offset,
@@ -6045,7 +5709,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_group<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         group: *mut mpi_sys::MPI_Group,
@@ -6057,7 +5720,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_amode<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         amode: *mut ::std::os::raw::c_int,
@@ -6069,7 +5731,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_set_info<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         info: mpi_sys::MPI_Info,
@@ -6081,7 +5742,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_info<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         info_used: *mut mpi_sys::MPI_Info,
@@ -6093,7 +5753,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_set_view<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         disp: mpi_sys::MPI_Offset,
@@ -6116,7 +5775,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_view<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         disp: *mut mpi_sys::MPI_Offset,
@@ -6137,7 +5795,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_at<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6160,7 +5817,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_at_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6183,7 +5839,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_at<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6206,7 +5861,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_at_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6229,7 +5883,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iread_at<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6252,7 +5905,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iwrite_at<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6275,7 +5927,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6296,7 +5947,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6317,7 +5967,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6338,7 +5987,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6359,7 +6007,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iread<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6380,7 +6027,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iwrite<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6401,7 +6047,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_seek<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6418,7 +6063,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_position<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: *mut mpi_sys::MPI_Offset,
@@ -6430,7 +6074,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_byte_offset<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6447,7 +6090,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_shared<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6468,7 +6110,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_shared<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6489,7 +6130,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iread_shared<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6510,7 +6150,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iwrite_shared<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6531,7 +6170,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_ordered<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6552,7 +6190,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_ordered<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6573,7 +6210,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_seek_shared<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6590,7 +6226,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_position_shared<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: *mut mpi_sys::MPI_Offset,
@@ -6602,7 +6237,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_at_all_begin<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6623,7 +6257,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_at_all_end<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6640,7 +6273,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_at_all_begin<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6661,7 +6293,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_at_all_end<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6678,7 +6309,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_all_begin<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6697,7 +6327,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_all_end<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6714,7 +6343,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_all_begin<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6733,7 +6361,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_all_end<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6750,7 +6377,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_ordered_begin<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6769,7 +6395,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_read_ordered_end<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6786,7 +6411,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_ordered_begin<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6805,7 +6429,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_write_ordered_end<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
@@ -6822,7 +6445,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_type_extent<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         datatype: mpi_sys::MPI_Datatype,
@@ -6839,7 +6461,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn register_datarep<F>(
-        &self,
         next_f: UnsafeBox<F>,
         datarep: *const ::std::os::raw::c_char,
         read_conversion_fn: mpi_sys::MPI_Datarep_conversion_function,
@@ -6868,7 +6489,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_set_atomicity<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         flag: ::std::os::raw::c_int,
@@ -6880,7 +6500,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_get_atomicity<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         flag: *mut ::std::os::raw::c_int,
@@ -6891,7 +6510,7 @@ pub trait RawMpiInterceptionLayer {
         unsafe { next_f.unwrap()(fh, flag) }
     }
     #[inline]
-    fn file_sync<F>(&self, next_f: UnsafeBox<F>, fh: mpi_sys::MPI_File) -> ::std::os::raw::c_int
+    fn file_sync<F>(next_f: UnsafeBox<F>, fh: mpi_sys::MPI_File) -> ::std::os::raw::c_int
     where
         F: FnOnce(mpi_sys::MPI_File) -> ::std::os::raw::c_int,
     {
@@ -6899,7 +6518,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iread_at_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6922,7 +6540,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iwrite_at_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         offset: mpi_sys::MPI_Offset,
@@ -6945,7 +6562,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iread_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *mut ::std::os::raw::c_void,
@@ -6966,7 +6582,6 @@ pub trait RawMpiInterceptionLayer {
     }
     #[inline]
     fn file_iwrite_all<F>(
-        &self,
         next_f: UnsafeBox<F>,
         fh: mpi_sys::MPI_File,
         buf: *const ::std::os::raw::c_void,
