@@ -10,10 +10,8 @@ macro_rules! install_pmpi_layer {
             $($arg_id : $arg_tp),*
         ) -> $ret_tp {
             unsafe {
-                let mut intcpt_inst = <$layer as Default>::default();
-                <$layer as $crate::MpiInterceptionLayer>::$fn_intcpt(
-                    &intcpt_inst,
-                    |$($arg_id),*| $crate::mpi_sys::$mpi_intcpt($($arg_id),*),
+                <$layer as $crate::RawMpiInterceptionLayer>::$fn_intcpt(
+                    $crate::UnsafeBox::new(|$($arg_id),*| $crate::mpi_sys::$mpi_intcpt($($arg_id),*)),
                     $($arg_id),*
                 )
             }

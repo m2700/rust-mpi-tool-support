@@ -1,9 +1,9 @@
 #[macro_export]
 macro_rules! install_qmpi_layer {
-    (@intercept( $layer:ty, $fn_intcpt:ident, $intcpt_inst:ident )
+    (@intercept( $layer:ty, $fn_intcpt:ident )
         $fn_id:ident ( $($arg_inp:expr),* )
     ) => (
-        <$layer as $crate::MpiInterceptionLayer>::$fn_intcpt( & $intcpt_inst $(, $arg_inp)* )
+        <$layer as $crate::RawMpiInterceptionLayer>::$fn_intcpt( $($arg_inp),* )
     );
 
     (@get_level $index:ident, $func_index:expr, $v:ident) => (
@@ -31,10 +31,9 @@ macro_rules! install_qmpi_layer {
             >
              = ::std::mem::transmute(func_ptr);
 
-        let mut intcpt_inst = <$layer as Default>::default();
         let func_ptr = func_ptr.expect("function pointer for execution is null, function can't be executed");
-        let next_f = |$($arg_id),*| func_ptr( $( $arg_id ,)* level, v );
-        let res = $crate::install_qmpi_layer!(@intercept($layer, $fn_intcpt, intcpt_inst)
+        let next_f = $crate::UnsafeBox::new(|$($arg_id),*| func_ptr( $( $arg_id ,)* level, v ));
+        let res = $crate::install_qmpi_layer!(@intercept($layer, $fn_intcpt)
             $fn_id ( next_f $(, $arg_id)* )
         );
         res
