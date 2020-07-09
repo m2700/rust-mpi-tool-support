@@ -3,10 +3,7 @@ use std::{
     slice,
 };
 
-use mpi_sys::{
-    MPI_Datatype, MPI_DOUBLE, MPI_FLOAT, MPI_INT16_T, MPI_INT32_T, MPI_INT64_T, MPI_INT8_T,
-    MPI_UINT16_T, MPI_UINT32_T, MPI_UINT64_T, MPI_UINT8_T,
-};
+use mpi_sys::*;
 
 pub trait Buffer {
     fn item_datatype(&self) -> MPI_Datatype;

@@ -16,8 +16,10 @@ static BCAST_CALL_COUNTER: AtomicU32 = AtomicU32::new(0);
 static BARRIER_CALL_COUNTER: AtomicU32 = AtomicU32::new(0);
 static FINALIZE_CALL_COUNTER: AtomicU32 = AtomicU32::new(0);
 
-#[derive(Default)]
 struct MyQmpiLayer;
+// impl MpiInterceptionLayer for MyQmpiLayer {
+//
+// }
 impl RawMpiInterceptionLayer for MyQmpiLayer {
     fn init<F>(next_f: UnsafeBox<F>, argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_int
     where
@@ -128,6 +130,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
                     mpi_sys::MPI_COMM_WORLD,
                 );
             }
+            println!("counter results: {:?}", count_sums);
         } else {
             unsafe {
                 mpi_sys::MPI_Reduce(

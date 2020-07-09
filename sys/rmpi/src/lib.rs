@@ -17,8 +17,14 @@ mod buffer;
 mod communicator;
 mod error;
 mod process;
+mod request;
+mod status;
+mod tag;
 
 pub use buffer::{Buffer, MpiDatatype};
 pub use communicator::Communicator;
 pub use error::{Error, RmpiResult};
 pub use process::Process;
+pub use request::Request;
+pub use status::Status;
+pub use tag::Tag;
