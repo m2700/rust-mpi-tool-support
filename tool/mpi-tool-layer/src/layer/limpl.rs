@@ -1,7 +1,10 @@
 use std::{os::raw::*, ptr, slice};
 
 use mpi_sys::*;
-use rmpi::{Buffer, Communicator, MpiDatatype, Request, Status};
+use rmpi::{
+    request::{Request, RequestSlice},
+    Buffer, Communicator, MpiDatatype, Status,
+};
 
 use crate::{RawMpiInterceptionLayer, UnsafeBox};
 
@@ -340,6 +343,34 @@ where
             )
         }
         #[inline]
+        fn waitany(
+            unsafe next_f,
+            count: c_int,
+            array_of_requests: *mut MPI_Request,
+            indx: *mut c_int,
+            status: *mut MPI_Status,
+        ) -> c_int
+        {
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::waitany(
+                    |req_slc| {
+                        unsafe {
+                            req_slc.waitany_with(next_f.unwrap())
+                        }
+                    },
+                    unsafe{
+                        RequestSlice::from_raw_mut(slice::from_raw_parts_mut(array_of_requests, count as usize))
+                    }
+                ).map(|(out_indx, out_status)|{
+                    unsafe {
+                        indx.write(out_indx as c_int);
+                        status.write(out_status.into_raw());
+                    }
+                })
+            )
+        }
+
+        #[inline]
         fn test(
             unsafe next_f,
             request: *mut MPI_Request,
@@ -375,6 +406,33 @@ where
                         }
                     }
                 })
+            )
+        }
+
+        #[inline]
+        fn request_free(unsafe next_f, request: *mut MPI_Request) -> c_int
+        {
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::free(
+                    |request| {
+                        unsafe{
+                            request.free_with(
+                                next_f.unwrap(),
+                            )
+                        }
+                    },
+                    unsafe{Request::from_raw(*request)}
+                )
+            )
+        }
+
+        #[inline]
+        fn finalize(unsafe next_f) -> c_int
+        {
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::finalize(
+                    || rmpi::Error::from_mpi_res(unsafe{next_f.unwrap()}())
+                )
             )
         }
     }

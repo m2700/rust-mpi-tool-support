@@ -11,6 +11,8 @@ pub trait Buffer {
     fn into_raw_mut(&mut self) -> (*mut c_void, c_int);
     unsafe fn from_raw<'b>(buf: *const c_void, count: c_int) -> &'b Self;
     unsafe fn from_raw_mut<'b>(buf: *mut c_void, count: c_int) -> &'b mut Self;
+
+    fn as_bytes(&self) -> &[u8];
 }
 impl<T> Buffer for [T]
 where
@@ -37,6 +39,11 @@ where
     #[inline]
     unsafe fn from_raw_mut<'b>(buf: *mut c_void, count: c_int) -> &'b mut Self {
         slice::from_raw_parts_mut(buf as *mut T, count as usize)
+    }
+
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        unsafe { self.align_to().1 }
     }
 }
 

@@ -1,0 +1,15 @@
+[package]
+name = "mpi-test-tool2"
+version = "0.1.0"
+authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pmpi-tool-creator = { path = "../pmpi-tool-creator" }
+mpi-tool-layer = { path = "../mpi-tool-layer", features = ["rmpi_support"] }
+rmpi = { path = "../../sys/rmpi", features = ["tool_mode"] }

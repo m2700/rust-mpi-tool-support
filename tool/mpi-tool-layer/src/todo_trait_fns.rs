@@ -1,17 +1,4 @@
 #[inline]
-fn waitany<F>(
-    next_f: UnsafeBox<F>,
-    count: c_int,
-    array_of_requests: *mut MPI_Request,
-    indx: *mut c_int,
-    status: *mut MPI_Status,
-) -> c_int
-where
-    F: FnOnce(c_int, *mut MPI_Request, *mut c_int, *mut MPI_Status) -> c_int,
-{
-    unsafe { next_f.unwrap()(count, array_of_requests, indx, status) }
-}
-#[inline]
 fn testany<F>(
     next_f: UnsafeBox<F>,
     count: c_int,

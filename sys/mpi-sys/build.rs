@@ -410,7 +410,7 @@ const MPI_FUNCTIONS: [&str; 360] = [
     "MPI_Wtick",
     "MPI_Wtime",
 ];
-const MPI_VARS: [&str; 45] = [
+const MPI_VARS: [&str; 47] = [
     "RUST_MPI_CHAR",
     "RUST_MPI_SIGNED_CHAR",
     "RUST_MPI_UNSIGNED_CHAR",
@@ -456,6 +456,8 @@ const MPI_VARS: [&str; 45] = [
     "RUST_MPI_MAXLOC",
     "RUST_MPI_REPLACE",
     "RUST_MPI_ANY_TAG",
+    "RUST_MPI_REQUEST_NULL",
+    "MPI_UNDEFINED",
 ];
 
 fn main() {

@@ -1,6 +1,9 @@
 use std::os::raw::c_int;
 
-use rmpi::{Buffer, MpiDatatype, Process, Request, RmpiResult, Status, Tag};
+use rmpi::{
+    request::{Request, RequestSlice},
+    Buffer, MpiDatatype, Process, RmpiResult, Status, Tag,
+};
 
 pub trait MpiInterceptionLayer {
     trait_layer_function! {
@@ -56,6 +59,14 @@ pub trait MpiInterceptionLayer {
         #[inline]
         fn wait(request: &mut Request) -> RmpiResult<Status>;
         #[inline]
+        fn waitany(requests: &mut RequestSlice) -> RmpiResult<(usize, Status)>;
+
+        #[inline]
         fn test(request: &mut Request) -> RmpiResult<Option<Status>>;
+        #[inline]
+        fn free(request: Request) -> RmpiResult;
+
+        #[inline]
+        fn finalize() -> RmpiResult;
     }
 }

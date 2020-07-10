@@ -6,7 +6,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         fn $fn_id:ident $(< $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
-        ( unsafe $nextf:ident, $($argp:ident : $argt:ty),* $(,)? ) -> $ret:ty
+        ( unsafe $nextf:ident $(, $argp:ident : $argt:ty)* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
             )?
@@ -29,7 +29,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         fn $fn_id:ident $(< $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
-        ( $nextf:ident, $($argp:ident : $argt:ty),* $(,)? ) -> $ret:ty
+        ( $nextf:ident $(, $argp:ident : $argt:ty)* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
             )?
@@ -53,7 +53,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         fn $fn_id:ident $(< $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
-        ( unsafe, $($argp:ident : $argt:ty),* $(,)? ) -> $ret:ty
+        ( unsafe $(, $argp:ident : $argt:ty)* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
             )? ;

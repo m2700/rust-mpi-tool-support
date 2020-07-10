@@ -2,8 +2,10 @@ macro_rules! unsafe_with_buf {
     ( ($buf:ident, $count:ident, $datatype:ident) => $buffer:pat => $ret:expr ) => {
         define_datatype! {
             type Elem = $datatype;
-            {let $buffer = unsafe { <[Elem] as Buffer>::from_raw($buf, $count) };
-            $ret}
+            {
+                let $buffer = unsafe { <[Elem] as Buffer>::from_raw($buf, $count) };
+                $ret
+            }
         }
     };
 }
@@ -11,8 +13,10 @@ macro_rules! unsafe_with_buf_mut {
     ( ($buf:ident, $count:ident, $datatype:ident) => $buffer:pat => $ret:expr ) => {
         define_datatype! {
             type Elem = $datatype;
-            {let $buffer = unsafe { <[Elem] as Buffer>::from_raw_mut($buf, $count) };
-            $ret}
+            {
+                let $buffer = unsafe { <[Elem] as Buffer>::from_raw_mut($buf, $count) };
+                $ret
+            }
         }
     };
 }
@@ -48,6 +52,36 @@ macro_rules! define_datatype {
             $ret
         } else if $datatype == c_double::datatype() {
             type $dt_tp = c_double;
+            $ret
+        } else if $datatype == MPI_CHAR {
+            type $dt_tp = ::std::os::raw::c_char;
+            $ret
+        } else if $datatype == MPI_UNSIGNED_CHAR {
+            type $dt_tp = ::std::os::raw::c_uchar;
+            $ret
+        } else if $datatype == MPI_SIGNED_CHAR {
+            type $dt_tp = ::std::os::raw::c_schar;
+            $ret
+        } else if $datatype == MPI_SHORT {
+            type $dt_tp = ::std::os::raw::c_short;
+            $ret
+        } else if $datatype == MPI_UNSIGNED_SHORT {
+            type $dt_tp = ::std::os::raw::c_ushort;
+            $ret
+        } else if $datatype == MPI_INT {
+            type $dt_tp = ::std::os::raw::c_int;
+            $ret
+        } else if $datatype == MPI_UNSIGNED {
+            type $dt_tp = ::std::os::raw::c_uint;
+            $ret
+        } else if $datatype == MPI_LONG {
+            type $dt_tp = ::std::os::raw::c_long;
+            $ret
+        } else if $datatype == MPI_UNSIGNED_LONG {
+            type $dt_tp = ::std::os::raw::c_ulong;
+            $ret
+        } else if $datatype == MPI_LONG_LONG_INT {
+            type $dt_tp = ::std::os::raw::c_longlong;
             $ret
         } else {
             panic!("{:?} not supported", $datatype)

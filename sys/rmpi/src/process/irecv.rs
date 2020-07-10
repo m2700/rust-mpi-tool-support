@@ -2,7 +2,7 @@ use std::os::raw::*;
 
 use mpi_sys::*;
 
-use crate::{Buffer, Error, Request, RmpiResult, Tag};
+use crate::{request::Request, Buffer, Error, RmpiResult, Tag};
 
 use super::Process;
 
