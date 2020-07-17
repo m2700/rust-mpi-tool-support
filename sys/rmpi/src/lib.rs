@@ -16,6 +16,7 @@ macro_rules! tool_mode_item {
 mod buffer;
 mod communicator;
 mod error;
+mod mpi_op;
 mod process;
 pub mod request;
 mod status;
@@ -27,3 +28,4 @@ pub use error::{Error, RmpiResult};
 pub use process::Process;
 pub use status::Status;
 pub use tag::Tag;
+pub use mpi_op::MpiOp;

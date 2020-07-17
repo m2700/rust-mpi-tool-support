@@ -1,4 +1,4 @@
-use std::os::raw::c_int;
+use std::{os::raw::c_int, mem::transmute, slice};
 
 use mpi_sys::*;
 
@@ -16,6 +16,24 @@ impl Status {
     pub const fn into_raw(self) -> MPI_Status {
         self.0
     }
+
+    #[inline]
+    pub fn from_raw_slice<'a>(raw: *const MPI_Status, len: usize) -> &'a [Self] {
+        unsafe{transmute(slice::from_raw_parts(raw, len))}
+    }
+    #[inline]
+    pub fn from_raw_slice_mut<'a>(raw: *mut MPI_Status, len: usize) -> &'a mut [Self] {
+        unsafe{transmute(slice::from_raw_parts_mut(raw, len))}
+    }
+    #[inline]
+    pub fn into_raw_slice(this: &[Self]) -> &[MPI_Status] {
+        unsafe{transmute(this)}
+    }
+    #[inline]
+    pub fn into_raw_slice_mut(this: &mut [Self]) -> &mut [MPI_Status] {
+        unsafe{transmute(this)}
+    }
+
     tool_mode_item! {
         #[inline]
         pub unsafe fn get_count_with<F, Datatype>(&self, get_count: F) -> RmpiResult<c_int>

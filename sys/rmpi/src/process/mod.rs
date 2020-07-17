@@ -5,7 +5,7 @@ use crate::Communicator;
 mod irecv;
 mod isend;
 mod recv;
-mod send;
+mod send;mod bcast;
 
 pub struct Process<'c> {
     pub(crate) communicator: &'c Communicator,

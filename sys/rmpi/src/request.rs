@@ -103,6 +103,11 @@ impl RequestSlice {
         transmute(slc)
     }
 
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     tool_mode_item! {
         #[inline]
         pub unsafe fn waitany_with<F>(&mut self, mpi_waitany: F) -> RmpiResult<(usize, Status)>
@@ -123,6 +128,58 @@ impl RequestSlice {
             self.waitany_with(|count, array_of_requests, indx, status| {
                 MPI_Waitany(count, array_of_requests, indx, status)
             })
+        }
+    }
+
+    tool_mode_item! {
+        #[inline]
+        pub unsafe fn testany_with<F>(&mut self, mpi_testany: F) -> RmpiResult<Option<(usize, Status)>>
+            where F: FnOnce(c_int, *mut MPI_Request, *mut c_int, *mut c_int, *mut MPI_Status) -> c_int
+        {
+            let mut indx = 0;
+            let mut flag = 0;
+            let mut status = MaybeUninit::uninit();
+            Error::from_mpi_res(
+                mpi_testany(
+                    self.0.len() as c_int, self.0.as_mut_ptr(), &mut indx, &mut flag,
+                    status.as_mut_ptr()
+                )
+            ).map(|()|{
+                if flag != 0{
+                    Some((indx as usize, Status::from_raw(status.assume_init())))
+                } else { None }
+            })
+        }
+    }
+    #[inline]
+    pub fn testany(&mut self) -> RmpiResult<Option<(usize, Status)>> {
+        unsafe {
+            self.testany_with(|count, array_of_requests, indx, flag, status| {
+                MPI_Testany(count, array_of_requests, indx, flag, status)
+            })
+        }
+    }
+
+    tool_mode_item! {
+        #[inline]
+        pub unsafe fn waitall_with<F>(&mut self, mpi_waitall: F, statuses: &mut [Status]) -> RmpiResult
+            where F: FnOnce(c_int, *mut MPI_Request, *mut MPI_Status) -> c_int
+        {
+            debug_assert_eq!(self.len(), statuses.len());
+            Error::from_mpi_res(
+                mpi_waitall(
+                    self.0.len() as c_int, self.0.as_mut_ptr(),
+                    Status::into_raw_slice_mut(statuses).as_mut_ptr()
+                )
+            )
+        }
+    }
+    #[inline]
+    pub fn waitall(&mut self, statuses: &mut [Status]) -> RmpiResult {
+        unsafe {
+            self.waitall_with(|count, array_of_requests, array_of_statuses| {
+                MPI_Waitall(count, array_of_requests, array_of_statuses)
+            }, statuses)
         }
     }
 }

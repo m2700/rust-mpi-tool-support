@@ -16,6 +16,16 @@ where
 {
     trait_layer_function! {
         #[inline]
+        fn finalize(unsafe next_f) -> c_int
+        {
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::finalize(
+                    || rmpi::Error::from_mpi_res(unsafe{next_f.unwrap()}())
+                )
+            )
+        }
+
+        #[inline]
         fn send(
             unsafe next_f,
             buf: *const c_void,
@@ -359,7 +369,9 @@ where
                         }
                     },
                     unsafe{
-                        RequestSlice::from_raw_mut(slice::from_raw_parts_mut(array_of_requests, count as usize))
+                        RequestSlice::from_raw_mut(
+                            slice::from_raw_parts_mut(array_of_requests, count as usize)
+                        )
                     }
                 ).map(|(out_indx, out_status)|{
                     unsafe {
@@ -367,6 +379,30 @@ where
                         status.write(out_status.into_raw());
                     }
                 })
+            )
+        }
+        #[inline]
+        fn waitall(
+            unsafe next_f,
+            count: c_int,
+            array_of_requests: *mut MPI_Request,
+            array_of_statuses: *mut MPI_Status,
+        ) -> c_int
+        {
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::waitall(
+                    |req_slc, status_slc| {
+                        unsafe {
+                            req_slc.waitall_with(next_f.unwrap(), status_slc)
+                        }
+                    },
+                    unsafe{
+                        RequestSlice::from_raw_mut(
+                            slice::from_raw_parts_mut(array_of_requests, count as usize)
+                        )
+                    },
+                    Status::from_raw_slice_mut(array_of_statuses, count as usize)
+                )
             )
         }
 
@@ -408,6 +444,42 @@ where
                 })
             )
         }
+        #[inline]
+        fn testany(
+            unsafe next_f,
+            count: c_int,
+            array_of_requests: *mut MPI_Request,
+            indx: *mut c_int,
+            flag: *mut c_int,
+            status: *mut MPI_Status,
+        ) -> c_int
+        {
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::testany(
+                    |req_slc| {
+                        unsafe {
+                            req_slc.testany_with(next_f.unwrap())
+                        }
+                    },
+                    unsafe{
+                        RequestSlice::from_raw_mut(
+                            slice::from_raw_parts_mut(array_of_requests, count as usize)
+                        )
+                    }
+                ).map(|opt_out|{
+                    match opt_out {
+                        Some((out_indx, out_status)) => {
+                            unsafe {
+                                *flag = 1;
+                                indx.write(out_indx as c_int);
+                                status.write(out_status.into_raw());
+                            }
+                        }
+                        None => unsafe{*flag = 0}
+                    }
+                })
+            )
+        }
 
         #[inline]
         fn request_free(unsafe next_f, request: *mut MPI_Request) -> c_int
@@ -427,12 +499,26 @@ where
         }
 
         #[inline]
-        fn finalize(unsafe next_f) -> c_int
+        fn bcast(
+            unsafe next_f,
+            buffer: *mut c_void,
+            count: c_int,
+            datatype: MPI_Datatype,
+            root: c_int,
+            comm: MPI_Comm,
+        ) -> c_int
         {
-            rmpi::Error::result_into_mpi_res(
-                <Self as MpiInterceptionLayer>::finalize(
-                    || rmpi::Error::from_mpi_res(unsafe{next_f.unwrap()}())
-                )
+            unsafe_with_buf_mut!(
+                (buffer,count,datatype) => buffer => {
+                    rmpi::Error::result_into_mpi_res(
+                        <Self as MpiInterceptionLayer>::bcast(
+                            |buf, mut root| {
+                                unsafe{root.bcast_with(next_f.unwrap(), buf)}
+                            },
+                            buffer, unsafe{Communicator::from_raw(comm)}.get_process(root)
+                        )
+                    )
+                }
             )
         }
     }
