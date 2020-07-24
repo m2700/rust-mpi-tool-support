@@ -1,31 +1,55 @@
-macro_rules! tool_mode_item {
+macro_rules! local_mod_decide {
     (
-        $( #[ $m:meta ] )*
-        pub $($fntkns:tt)*
-    ) => {
-        #[cfg(feature = "tool_mode")]
-        $( #[ $m ] )*
-        pub $($fntkns)*
-
-        #[cfg(not(feature = "tool_mode"))]
-        $( #[ $m ] )*
-        pub(crate) $($fntkns)*
-    };
+        crate:: $($ptt:tt)*
+    ) => (
+        use crate:: $($ptt)* ;
+    );
+    (
+        mpi_sys:: $($ptt:tt)*
+    ) => (
+        use mpi_sys:: $($ptt)* ;
+    );
 }
 
-mod buffer;
-mod communicator;
-mod error;
-mod mpi_op;
-mod process;
-pub mod request;
-mod status;
-mod tag;
+macro_rules! local_mod {
+    () => ();
+    (
+        use $( $pth_prt_id:ident )::*;
+        $($cnt:tt)*
+    ) => {
+        local_mod_decide!($( $pth_prt_id )::*);
+        local_mod!($($cnt)*);
+    };
+    (
+        use $( $pth_prt_id:ident :: )* *;
+        $($cnt:tt)*
+    ) => {
+        local_mod_decide!($( $pth_prt_id :: )* *);
+        local_mod!($($cnt)*);
+    };
+    (
+        use $( $pth_prt_id:ident :: )* { $($tkn:tt)* };
+        $($cnt:tt)*
+    ) => {
+        local_mod_decide!($( $pth_prt_id :: )* { $($tkn)* });
+        local_mod!($($cnt)*);
+    };
+}
+include!("lib_mode_dependent.rs");
 
-pub use buffer::{Buffer, MpiDatatype};
-pub use communicator::Communicator;
-pub use error::{Error, RmpiResult};
-pub use process::Process;
-pub use status::Status;
-pub use tag::Tag;
-pub use mpi_op::MpiOp;
+#[cfg(feature = "tool_mode")]
+pub mod pmpi_mode {
+    macro_rules! local_mod_decide {
+        (
+            crate:: $($ptt:tt)*
+        ) => (
+            use crate::pmpi_mode:: $($ptt)* ;
+        );
+        (
+            mpi_sys:: $($ptt:tt)*
+        ) => (
+            use mpi_sys::pmpi:: $($ptt)* ;
+        );
+    }
+    include!("lib_mode_dependent.rs");
+}

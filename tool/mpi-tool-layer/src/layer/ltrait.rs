@@ -1,14 +1,41 @@
-use std::os::raw::c_int;
+use std::os::raw::{c_double, c_int};
 
-use rmpi::{
+use rmpi::pmpi_mode as rmpi;
+
+use self::rmpi::{
     request::{Request, RequestSlice},
-    Buffer, MpiDatatype, MpiOp, Process, RmpiResult, Status, Tag,
+    Buffer, Communicator, Group, MpiDatatype, MpiOp, Process, RmpiResult, Status, Tag,
 };
 
 pub trait MpiInterceptionLayer {
-    trait_layer_function! {
+    trait_layer_function!(
         #[inline]
         fn finalize() -> RmpiResult;
+
+        #[inline]
+        fn wtime() -> c_double;
+        #[inline]
+        fn wtick() -> c_double;
+
+        #[inline]
+        fn barrier(comm: &Communicator) -> RmpiResult;
+
+        #[inline]
+        fn group_incl(group: &Group, ranks: &[c_int]) -> RmpiResult<Group>;
+        #[inline]
+        fn group_free(group: Group) -> RmpiResult;
+
+        #[inline]
+        fn comm_size(comm: &Communicator) -> RmpiResult<c_int>;
+        #[inline]
+        fn comm_rank(comm: &Communicator) -> RmpiResult<c_int>;
+        #[inline]
+        fn comm_create(
+            comm: &Communicator,
+            group: &Group,
+        ) -> RmpiResult<Communicator>;
+        #[inline]
+        fn comm_free(comm: Communicator) -> RmpiResult;
 
         #[inline]
         fn send<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult
@@ -35,11 +62,11 @@ pub trait MpiInterceptionLayer {
         fn ibsend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult<Request>
         where
             Buf: Buffer;
-            #[inline]
+        #[inline]
         fn issend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult<Request>
         where
             Buf: Buffer;
-            #[inline]
+        #[inline]
         fn irsend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult<Request>
         where
             Buf: Buffer;
@@ -48,7 +75,7 @@ pub trait MpiInterceptionLayer {
         fn bcast<Buf: ?Sized>(buf: &mut Buf, root: Process) -> RmpiResult;
 
         #[inline]
-        fn recv<Buf: ?Sized>( buf: &mut Buf, src: Process, tag: Tag) -> RmpiResult<Status>
+        fn recv<Buf: ?Sized>(buf: &mut Buf, src: Process, tag: Tag) -> RmpiResult<Status>
         where
             Buf: Buffer;
 
@@ -75,7 +102,7 @@ pub trait MpiInterceptionLayer {
         fn testany(request: &mut RequestSlice) -> RmpiResult<Option<(usize, Status)>>;
 
         #[inline]
-        fn free(request: Request) -> RmpiResult;
+        fn request_free(request: Request) -> RmpiResult;
 
         // should I really use Buffers of different datatypes??
         #[inline]
@@ -83,35 +110,86 @@ pub trait MpiInterceptionLayer {
             sendbuf: &SendBuf,
             recvbuf: &mut RecvBuf,
             root: Process,
-        ) -> RmpiResult where SendBuf: Buffer, RecvBuf: Buffer;
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
         #[inline]
         fn gatherv<SendBuf: ?Sized, RecvBuf: ?Sized>(
             sendbuf: &SendBuf,
-            recvbuf: &mut RecvBuf,
-            displs: &[c_int],
+            recvbufs: &mut [&mut RecvBuf],
             root: Process,
-        ) -> RmpiResult where SendBuf: Buffer, RecvBuf: Buffer;
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
+        #[inline]
+        fn allgather<SendBuf: ?Sized, RecvBuf: ?Sized>(
+            sendbuf: &SendBuf,
+            recvbuf: &mut RecvBuf,
+            comm: &Communicator,
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
+        #[inline]
+        fn allgatherv<SendBuf: ?Sized, RecvBuf: ?Sized>(
+            sendbuf: &SendBuf,
+            recvbufs: &mut [&mut RecvBuf],
+            comm: &Communicator,
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
+
+        #[inline]
+        fn reduce<Buf: ?Sized>(
+            sendbuf: &Buf,
+            recvbuf: &mut Buf::Single,
+            op: MpiOp,
+            root: Process,
+        ) -> RmpiResult
+        where
+            Buf: Buffer;
+        #[inline]
+        fn allreduce<Buf: ?Sized>(
+            sendbuf: &Buf,
+            recvbuf: &mut Buf::Single,
+            op: MpiOp,
+            comm: &Communicator,
+        ) -> RmpiResult
+        where
+            Buf: Buffer;
+
+        #[inline]
+        fn scan<Buf: ?Sized>(
+            sendbuf: &Buf,
+            recvbuf: &mut Buf::Single,
+            op: MpiOp,
+            comm: &Communicator,
+        ) -> RmpiResult
+        where
+            Buf: Buffer;
+
+        //TODO
         #[inline]
         fn scatter<SendBuf: ?Sized, RecvBuf: ?Sized>(
             sendbuf: &SendBuf,
             recvbuf: &mut RecvBuf,
             root: Process,
-        ) -> RmpiResult where SendBuf: Buffer, RecvBuf: Buffer;
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
         #[inline]
         fn scatterv<SendBuf: ?Sized, RecvBuf: ?Sized>(
             sendbuf: &SendBuf,
             displs: &[c_int],
             recvbuf: &mut RecvBuf,
             root: Process,
-        ) -> RmpiResult where SendBuf: Buffer, RecvBuf: Buffer;
-
-        // even in MPI there is only one Datatype
-        #[inline]
-        fn reduce<Buf: ?Sized>(
-            sendbuf: &Buf,
-            recvbuf: &mut Buf,
-            op: MpiOp,
-            root: Process,
-        ) -> c_int where Buf: Buffer;
-    }
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
+    );
 }

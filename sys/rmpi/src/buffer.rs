@@ -3,21 +3,35 @@ use std::{
     slice,
 };
 
-use mpi_sys::*;
+local_mod!(
+    use mpi_sys::*;
+);
 
 pub trait Buffer {
+    type PrimitiveElemType;
+    type Single: SingleBuffer;
+
     fn item_datatype(&self) -> MPI_Datatype;
+
     fn into_raw(&self) -> (*const c_void, c_int);
     fn into_raw_mut(&mut self) -> (*mut c_void, c_int);
+
+    fn as_ptr(&self) -> *const Self::PrimitiveElemType;
+    fn as_mut_ptr(&mut self) -> *mut Self::PrimitiveElemType;
+
     unsafe fn from_raw<'b>(buf: *const c_void, count: c_int) -> &'b Self;
     unsafe fn from_raw_mut<'b>(buf: *mut c_void, count: c_int) -> &'b mut Self;
 
     fn as_bytes(&self) -> &[u8];
+    fn len(&self) -> usize;
 }
 impl<T> Buffer for [T]
 where
     T: MpiDatatype,
 {
+    type PrimitiveElemType = T;
+    type Single = T;
+
     #[inline]
     fn item_datatype(&self) -> MPI_Datatype {
         T::datatype()
@@ -32,6 +46,15 @@ where
         let len = self.len();
         (self.as_mut_ptr() as *mut c_void, len as c_int)
     }
+
+    #[inline]
+    fn as_ptr(&self) -> *const Self::PrimitiveElemType {
+        self.as_ptr()
+    }
+    #[inline]
+    fn as_mut_ptr(&mut self) -> *mut Self::PrimitiveElemType {
+        self.as_mut_ptr()
+    }
     #[inline]
     unsafe fn from_raw<'b>(buf: *const c_void, count: c_int) -> &'b Self {
         slice::from_raw_parts(buf as *const T, count as usize)
@@ -45,16 +68,76 @@ where
     fn as_bytes(&self) -> &[u8] {
         unsafe { self.align_to().1 }
     }
+    #[inline]
+    fn len(&self) -> usize {
+        self.len()
+    }
 }
 
-pub trait MpiDatatype {
+pub trait SingleBuffer: Buffer {}
+impl<T> Buffer for T
+where
+    T: MpiDatatype,
+{
+    type PrimitiveElemType = T;
+    type Single = T;
+
+    #[inline]
+    fn item_datatype(&self) -> MPI_Datatype {
+        T::datatype()
+    }
+    #[inline]
+    fn into_raw(&self) -> (*const c_void, c_int) {
+        (self.as_ptr() as *mut c_void, 1)
+    }
+    #[inline]
+    fn into_raw_mut(&mut self) -> (*mut c_void, c_int) {
+        (self.as_mut_ptr() as *mut c_void, 1)
+    }
+
+    #[inline]
+    fn as_ptr(&self) -> *const Self::PrimitiveElemType {
+        self
+    }
+    #[inline]
+    fn as_mut_ptr(&mut self) -> *mut Self::PrimitiveElemType {
+        self
+    }
+    #[inline]
+    unsafe fn from_raw<'b>(buf: *const c_void, count: c_int) -> &'b Self {
+        assert_eq!(count, 1, "single buffer must have count 1");
+        (buf as *const T)
+            .as_ref()
+            .expect("single buffer must not be nullptr")
+    }
+    #[inline]
+    unsafe fn from_raw_mut<'b>(buf: *mut c_void, count: c_int) -> &'b mut Self {
+        assert_eq!(count, 1, "single buffer must have count 1");
+        (buf as *mut T)
+            .as_mut()
+            .expect("single buffer must not be nullptr")
+    }
+
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        unsafe { slice::from_ref(self).align_to().1 }
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        1
+    }
+}
+impl<T> SingleBuffer for T where T: MpiDatatype {}
+
+/// is unsafe because it has to be transmutable to a byte array
+pub unsafe trait MpiDatatype {
     fn datatype() -> MPI_Datatype;
 }
 
 macro_rules! impl_mpi_datatype {
     ( $( $tp:ty : $dttp:expr ),* ) => {
         $(
-            impl MpiDatatype for $tp {
+            unsafe impl MpiDatatype for $tp {
                 #[inline]
                 fn datatype() -> MPI_Datatype {
                     $dttp
@@ -64,6 +147,7 @@ macro_rules! impl_mpi_datatype {
     };
 }
 
+//TODO bool, complex, etc.
 impl_mpi_datatype!(
     u8: MPI_UINT8_T,
     u16: MPI_UINT16_T,

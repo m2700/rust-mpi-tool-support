@@ -1,87 +1,169 @@
 #!/usr/bin/env python3
 
+import io, os
+import sys
 import patterns
 from utility import *
 
-with open("input.txt") as input_file:
-    with open("type_convert_output.txt", "w") as type_convert_output_file:
-        with open("trait_functions_output.txt", "w") as trait_functions_output_file:
-            with open("pmpi_type_convert_output.txt", "w") as pmpi_type_convert_output_file:
-                for line in input_file.readlines():
-                    macro_arg_line = []
-                    rust_arg_line = []
-                    rust_arg_types = []
-                    rust_arg_idents = []
-                    line = line.strip()
-                    if line.startswith("fn ") and line.endswith(";"):
-                        line = line[3:-1].strip()
+class Eof(Exception):
+    pass
 
-                        line, fn_ident = cut_of_ident_front(line)
-                        assert len(fn_ident) > 0
-                        line, res_tp = cut_of_ident_back(line)
-                        assert len(res_tp) > 0
-                        rust_res_tp = patterns.type_map.get(res_tp);
-                        if rust_res_tp == None:
-                            print("no replacement for \"", res_tp, "\"", sep = "")
-                            exit(-1)
-                        macro_rust_res_tp = patterns.macro_type_map.get(res_tp);
-                        if macro_rust_res_tp == None:
-                            print("no macro replacement for \"", res_tp, "\"", sep = "")
-                            exit(-1)
-                        line = line.strip()
+class ExternFunction:
+    @classmethod
+    def parse(cls, input_file):
+        tk_extern = parse_token(input_file)
+        if tk_extern == "":
+            raise Eof()
+        assert tk_extern == "extern"
+        assert parse_token(input_file) == '"C"'
+        funcion_scope_tokens = parse_token_group(input_file)
+        assert funcion_scope_tokens[:3] == ["{", "pub", "fn"]
+        assert funcion_scope_tokens[-2:] == [";", "}"]
 
-                        assert line.endswith("->")
-                        line = line[:-2].strip()
+        function_ident = funcion_scope_tokens[3]
+        arg_ret_line = funcion_scope_tokens[4:-2]
+        return cls(function_ident, arg_ret_line)
 
-                        assert line.startswith("(")
-                        assert line.endswith(")")
-                        line = line[1:-1].strip()
+    def __init__(self, function_ident, arg_ret_line):
+        self.function_ident = function_ident
+        self.arg_ret_line = arg_ret_line
 
-                        if line != "":
-                            for arg in line.split(","):
-                                pre_arg, arg_name, post_arg = extract_arg_name(arg)
-                                pre_arg, post_arg = pre_arg.strip(), post_arg.strip()
-                                arg_name = into_valid_rust_ident(arg_name)
-                                assert len(pre_arg) > 0
+    def format_qmpi_macro(self):
+        assert self.function_ident[:4] == "MPI_"
+        mpiless_func_ident = self.function_ident[4:]
+        intrcpt_func_ident = "E_" + mpiless_func_ident
 
-                                macro_repl_type = patterns.macro_type_replacements.get((pre_arg, post_arg))
-                                if macro_repl_type == None:
-                                    print("no macro replacement for \"", pre_arg,
-                                          "\" <arg_name> \"", post_arg, "\"", sep = "")
-                                    exit(-1)
-                                macro_arg_line.append(arg_name + ": " + macro_repl_type)
+        mcr_arg_ret_line = \
+            tokens_to_string(self.arg_ret_line, patterns.macro_type_map)
 
-                                repl_type = patterns.type_replacements.get((pre_arg, post_arg))
-                                if repl_type == None:
-                                    print("no replacement for \"", pre_arg,
-                                          "\" <arg_name> \"", post_arg, "\"", sep = "")
-                                    exit(-1)
-                                rust_arg_line.append(arg_name + ": " + repl_type)
-                                rust_arg_types.append(repl_type)
-                                rust_arg_idents.append(arg_name)
+        return \
+            f"fn {intrcpt_func_ident}\
+[{patterns.macro_mpi_func_id_prefix}{mpiless_func_ident}, \
+{mpiless_func_ident.lower()}]\
+{mcr_arg_ret_line};"
 
-                        assert fn_ident.startswith("E_")
-                        intercept_ident = fn_ident[2:].lower()
-                        mpi_fn_ident = "MPI_"+fn_ident[2:]
+    def format_pmpi_macro(self):
+        assert self.function_ident[:4] == "MPI_"
+        mpiless_func_ident = self.function_ident[4:]
 
-                        type_convert_output_file.write(
-                            "fn " + fn_ident + "[" + patterns.macro_mpi_func_id_prefix + fn_ident[2:] + ", "
-                             + intercept_ident
-                             + "](" + ", ".join(macro_arg_line) + ") -> "
-                             + macro_rust_res_tp + ";\n"
-                        )
-                        trait_functions_output_file.write(
-                            "#[inline]fn " + intercept_ident + "<F>(&self, next_f: F, "
-                             + ", ".join(rust_arg_line) + ") -> " + rust_res_tp
-                             + " where F: FnOnce(" + ", ".join(rust_arg_types)
-                             + ") -> " + rust_res_tp + " {next_f(" + ",".join(rust_arg_idents) + ")}\n"
-                        )
-                        pmpi_type_convert_output_file.write(
-                            "fn " + mpi_fn_ident + "[" + intercept_ident + "]("
-                             + ", ".join(macro_arg_line) + ") -> "
-                             + macro_rust_res_tp + ";\n"
-                        )
+        mcr_arg_ret_line = \
+            tokens_to_string(self.arg_ret_line, patterns.macro_type_map)
 
-                    else:
-                        print("unexpected line:", repr(line))
-                        exit(-1)
+        return \
+            f"fn {self.function_ident}\
+[{mpiless_func_ident.lower()}]\
+{mcr_arg_ret_line};"
+
+    def format_trait(self):
+        assert self.function_ident[:4] == "MPI_"
+        mpiless_func_ident = self.function_ident[4:]
+
+        mcr_arg_ret_line = \
+            tokens_to_string(self.arg_ret_line, patterns.type_map)
+        assert mcr_arg_ret_line[0] == "("
+
+        mcr_arg_ret_line_reader = io.StringIO(mcr_arg_ret_line)
+        arg_line = parse_token_group(mcr_arg_ret_line_reader)
+        assert arg_line[0] == "("
+        assert arg_line[-1] == ")"
+
+        assert parse_token(mcr_arg_ret_line_reader) == "->"
+        return_type_tkns = []
+        tkn = parse_token(mcr_arg_ret_line_reader)
+        while tkn != "":
+            return_type_tkns.append(tkn)
+            tkn = parse_token(mcr_arg_ret_line_reader)
+        return_type = tokens_to_string(return_type_tkns, {})
+
+        arg_type_tokens = list(iter_split(arg_line[1:-1], ","))
+        if arg_type_tokens != [] and arg_type_tokens[-1] == []:
+            arg_type_tokens = arg_type_tokens[:-1]
+        if arg_type_tokens != [] and arg_type_tokens[-1] == ["..."]:
+            arg_type_tokens = arg_type_tokens[:-1]
+
+        arg_id_list = []
+        type_tkns_list = []
+        for arg_type_tkns in arg_type_tokens:
+            assert arg_type_tkns[1] == ":"
+            arg_id_list.append(arg_type_tkns[0])
+            type_tkns_list.append(
+                tokens_to_string(arg_type_tkns[2:], {})
+            )
+
+        types_joined = ", ".join(type_tkns_list)
+        arg_ids_joined = ",".join(arg_id_list)
+        mcr_arg_ret_line_cont = mcr_arg_ret_line[1:]
+
+        return \
+            f"#[inline] fn {mpiless_func_ident.lower()}\
+<F>(next_f: UnsafeBox<F>, \
+{mcr_arg_ret_line_cont} \
+where F: FnOnce({types_joined}) -> {return_type} \
+{{ unsafe{{ next_f.unwrap()({arg_ids_joined}) }} }}"
+
+    def format_fn_counter(self):
+        assert self.function_ident[:4] == "MPI_"
+        mpiless_func_ident = self.function_ident[4:]
+
+        mcr_arg_ret_line = \
+            tokens_to_string(self.arg_ret_line, patterns.type_map)
+        assert mcr_arg_ret_line[0] == "("
+
+        mcr_arg_ret_line_reader = io.StringIO(mcr_arg_ret_line)
+        arg_line = parse_token_group(mcr_arg_ret_line_reader)
+        assert arg_line[0] == "("
+        assert arg_line[-1] == ")"
+
+        assert parse_token(mcr_arg_ret_line_reader) == "->"
+        return_type_tkns = []
+        tkn = parse_token(mcr_arg_ret_line_reader)
+        while tkn != "":
+            return_type_tkns.append(tkn)
+            tkn = parse_token(mcr_arg_ret_line_reader)
+        return_type = tokens_to_string(return_type_tkns, {})
+
+        arg_type_tokens = list(iter_split(arg_line[1:-1], ","))
+        if arg_type_tokens != [] and arg_type_tokens[-1] == []:
+            arg_type_tokens = arg_type_tokens[:-1]
+        if arg_type_tokens != [] and arg_type_tokens[-1] == ["..."]:
+            arg_type_tokens = arg_type_tokens[:-1]
+
+        arg_id_list = []
+        type_tkns_list = []
+        for arg_type_tkns in arg_type_tokens:
+            assert arg_type_tkns[1] == ":"
+            arg_id_list.append(arg_type_tkns[0])
+            type_tkns_list.append(
+                tokens_to_string(arg_type_tkns[2:], {})
+            )
+
+        types_joined = ", ".join(type_tkns_list)
+        arg_ids_joined = ",".join(arg_id_list)
+        mcr_arg_ret_line_cont = mcr_arg_ret_line[1:]
+
+        return \
+            f"#[inline] fn {mpiless_func_ident.lower()}\
+<F>(next_f: UnsafeBox<F>, \
+{mcr_arg_ret_line_cont} \
+where F: FnOnce({types_joined}) -> {return_type} \
+{{\
+    *mpi_fn_counter_map.lock().unwrap().entry(\"{mpiless_func_ident}\").or_insert(0) += 1;\
+    unsafe{{next_f.unwrap()({arg_ids_joined})\
+}} }}"
+
+input_file=open("input.txt")
+qmpi_macro_output=open("qmpi_macro_output.txt", "w")
+trait_functions_output=open("trait_functions_output.txt", "w")
+pmpi_macro_output=open("pmpi_macro_output.txt", "w")
+fn_counter_output=open("fn_counter_output.txt", "w")
+
+while True:
+    try:
+        func = ExternFunction.parse(input_file)
+    except Eof:
+        break
+    
+    qmpi_macro_output.write(func.format_qmpi_macro() + "\n")
+    pmpi_macro_output.write(func.format_pmpi_macro() + "\n")
+    trait_functions_output.write(func.format_trait() + "\n")
+    fn_counter_output.write(func.format_fn_counter() + "\n")

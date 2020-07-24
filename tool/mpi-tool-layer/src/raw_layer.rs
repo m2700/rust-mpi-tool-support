@@ -1,6 +1,6 @@
 use std::os::raw::*;
 
-use mpi_sys::*;
+use mpi_sys::pmpi::*;
 
 #[repr(transparent)]
 pub struct UnsafeBox<T>(T);

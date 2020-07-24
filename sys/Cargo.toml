@@ -1,2 +1,2 @@
 [workspace]
-members = ["*-sys", "rmpi"]
+members = ["*-sys", "rmpi", "tool_mpi-macro"]

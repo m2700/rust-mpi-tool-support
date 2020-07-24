@@ -1,5 +1,5 @@
 [package]
-name = "mpi-test-tool2"
+name = "mpi-tool-empty-pmpi"
 version = "0.1.0"
 authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
 edition = "2018"

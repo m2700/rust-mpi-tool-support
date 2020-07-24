@@ -1,5 +1,5 @@
 [package]
-name = "mpi-test-tool"
+name = "mpi-tool-function_counter"
 version = "0.1.0"
 authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
 edition = "2018"
@@ -10,6 +10,8 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-# pmpi-tool-creator = { path = "../pmpi-tool-creator" }
-qmpi-tool-creator = { path = "../qmpi-tool-creator" }
+pmpi-tool-creator = { path = "../pmpi-tool-creator" }
+# qmpi-tool-creator = { path = "../qmpi-tool-creator" }
 mpi-tool-layer = { path = "../mpi-tool-layer", features = ["rmpi_support"] }
+
+lazy_static = "*"

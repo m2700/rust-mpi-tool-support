@@ -2,6 +2,7 @@ mod raw_layer;
 
 pub use raw_layer::{RawMpiInterceptionLayer, UnsafeBox};
 
+#[cfg(feature = "rmpi_support")]
 macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*

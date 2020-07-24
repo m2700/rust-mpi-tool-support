@@ -21,7 +21,11 @@ macro_rules! install_qmpi_layer {
         let level: ::std::os::raw::c_int = $level;
         let v: *mut $crate::qmpi_sys::vector = $v;
 
-        let level=$crate::install_qmpi_layer!(@get_level level, $fn_idx, v);
+        let level = if $fn_idx == $crate::qmpi_sys::_MPI_funcs::_MPI_Pcontrol {
+            0
+        } else {
+            $crate::install_qmpi_layer!(@get_level level, $fn_idx, v)
+        };
 
         let func_ptr:
             Option<

@@ -1,11 +1,16 @@
 use std::os::raw::c_int;
 
-use crate::Communicator;
+local_mod!(
+    use crate::Communicator;
+);
 
+mod bcast;
+mod gather;
 mod irecv;
 mod isend;
 mod recv;
-mod send;mod bcast;
+mod reduce;
+mod send;
 
 pub struct Process<'c> {
     pub(crate) communicator: &'c Communicator,

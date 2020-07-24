@@ -1,8 +1,10 @@
 use std::os::raw::c_int;
 
-use mpi_sys::MPI_SUCCESS;
+local_mod!(
+    use mpi_sys::MPI_SUCCESS;
+);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Error(c_int);
 impl Error {
     #[inline]

@@ -26,7 +26,7 @@ fn prepare_dir(path: &Path) {
         })
         .unwrap();
 }
-async fn download_file(uri: Uri, file_path: &Path) {
+async fn download_file(uri: Uri, file_path: &Path, patch: &[[&str; 2]]) {
     if !file_path.exists() || mtime!(file_path) < mtime!("build.rs") {
         let https_client: Client<_, hyper::Body> = Client::builder().build(HttpsConnector::new());
 
@@ -34,11 +34,29 @@ async fn download_file(uri: Uri, file_path: &Path) {
         println!("Response: {}", resp.status());
 
         let mut file = File::create(file_path).unwrap();
+        let mut data = vec![];
         while let Some(chunk) = resp.body_mut().data().await {
-            file.write_all(&chunk.unwrap()).unwrap();
+            data.extend(chunk.unwrap());
         }
+        let mut data = String::from_utf8(data).unwrap();
+        for &[pat, repl] in patch {
+            data = data.replace(pat, repl);
+        }
+        file.write_all(data.as_bytes()).unwrap();
     }
 }
+
+#[cfg(feature = "bundled")]
+const QMPI_C_PATCH: [[&str; 2]; 2] = [
+    [
+        "int ret= ((_wtick_func)f_dl) (new_level, &v);",
+        "double ret= ((_wtick_func)f_dl) (new_level, &v);",
+    ],
+    [
+        "int ret= ((_wtime_func) f_dl) (new_level, &v);",
+        "double ret= ((_wtime_func) f_dl) (new_level, &v);",
+    ],
+];
 
 #[tokio::main]
 async fn main() {
@@ -82,12 +100,12 @@ async fn main() {
 
     #[cfg(feature = "bundled")]
     tokio_join!(
-        download_file(qmpi_h_uri, &qmpi_h_path),
-        download_file(qmpi_c_uri, &qmpi_c_path),
-        download_file(qmpi_arrays_h_uri, &qmpi_arrays_h_path)
+        download_file(qmpi_h_uri, &qmpi_h_path, &[]),
+        download_file(qmpi_c_uri, &qmpi_c_path, &QMPI_C_PATCH),
+        download_file(qmpi_arrays_h_uri, &qmpi_arrays_h_path, &[])
     );
     #[cfg(not(feature = "bundled"))]
-    download_file(qmpi_h_uri, &qmpi_h_path).await;
+    download_file(qmpi_h_uri, &qmpi_h_path, &[]).await;
 
     #[cfg(feature = "bundled")]
     cc::Build::new()

@@ -1,6 +1,8 @@
 use std::{ops::Deref, os::raw::*};
 
-use mpi_sys::*;
+local_mod!(
+    use mpi_sys::*;
+);
 
 #[derive(Clone, Copy, Default)]
 pub struct Tag(c_int);
