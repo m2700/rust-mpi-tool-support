@@ -1,5 +1,5 @@
 use std::{
-    mem::{forget, transmute},
+    mem::{forget, transmute, MaybeUninit},
     ops::Deref,
     os::raw::c_int,
     ptr,
@@ -7,17 +7,19 @@ use std::{
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Error, Process, RmpiResult};
+    use crate::{Error, Process, RmpiResult, Group};
 );
 
 mod allgather;
 mod allreduce;
+mod alltoall;
 mod barrier;
 mod create_subset;
 mod scan;
 
 /// non MPI_COMM_NULL Communicator handle that frees automatically
 #[repr(transparent)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Communicator(pub(crate) MPI_Comm);
 impl Drop for Communicator {
     #[inline]
@@ -89,7 +91,23 @@ impl Communicator {
     );
     #[inline]
     pub fn current_rank(&self) -> RmpiResult<c_int> {
-        unsafe { self.current_rank_with(|comm, size| MPI_Comm_rank(comm, size)) }
+        unsafe { self.current_rank_with(|comm, rank| MPI_Comm_rank(comm, rank)) }
+    }
+
+    tool_mode_item!(
+        #[inline]
+        pub unsafe fn group_with<F>(&self, mpi_comm_group: F) -> RmpiResult<Group>
+        where
+            F: FnOnce(MPI_Comm, *mut MPI_Group) -> c_int,
+        {
+            let mut group = MaybeUninit::uninit();
+            Error::from_mpi_res(mpi_comm_group(self.as_raw(), group.as_mut_ptr()))
+                .map(|()| Group::from_raw(group.assume_init()))
+        }
+    );
+    #[inline]
+    pub fn group(&self) -> RmpiResult<Group> {
+        unsafe { self.group_with(|comm, group| MPI_Comm_group(comm, group)) }
     }
 
     tool_mode_item!(

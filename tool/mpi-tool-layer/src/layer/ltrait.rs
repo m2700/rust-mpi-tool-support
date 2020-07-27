@@ -4,13 +4,20 @@ use rmpi::pmpi_mode as rmpi;
 
 use self::rmpi::{
     request::{Request, RequestSlice},
-    Buffer, Communicator, Group, MpiDatatype, MpiOp, Process, RmpiResult, Status, Tag,
+    Buffer, CStrMutPtr, Communicator, Group, MpiDatatype, MpiOp, Process, RmpiContext, RmpiResult,
+    Status, Tag,
 };
 
 pub trait MpiInterceptionLayer {
     trait_layer_function!(
         #[inline]
+        fn init(args: &mut &mut [CStrMutPtr]) -> RmpiResult<Option<RmpiContext>>;
+        #[inline]
+        fn initialized() -> RmpiResult<bool>;
+        #[inline]
         fn finalize() -> RmpiResult;
+        #[inline]
+        fn finalized() -> RmpiResult<bool>;
 
         #[inline]
         fn wtime() -> c_double;
@@ -30,10 +37,7 @@ pub trait MpiInterceptionLayer {
         #[inline]
         fn comm_rank(comm: &Communicator) -> RmpiResult<c_int>;
         #[inline]
-        fn comm_create(
-            comm: &Communicator,
-            group: &Group,
-        ) -> RmpiResult<Communicator>;
+        fn comm_create(comm: &Communicator, group: &Group) -> RmpiResult<Communicator>;
         #[inline]
         fn comm_free(comm: Communicator) -> RmpiResult;
 
@@ -55,54 +59,83 @@ pub trait MpiInterceptionLayer {
             Buf: Buffer;
 
         #[inline]
-        fn isend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult<Request>
+        fn isend<'b, Buf: ?Sized>(buf: &'b Buf, dest: Process, tag: Tag) -> RmpiResult<Request<'b>>
         where
             Buf: Buffer;
         #[inline]
-        fn ibsend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult<Request>
+        fn ibsend<'b, Buf: ?Sized>(
+            buf: &'b Buf,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult<Request<'b>>
         where
             Buf: Buffer;
         #[inline]
-        fn issend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult<Request>
-        where
-            Buf: Buffer;
-        #[inline]
-        fn irsend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult<Request>
+        fn issend<'b, Buf: ?Sized>(
+            buf: &'b Buf,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult<Request<'b>>
         where
             Buf: Buffer;
 
         #[inline]
-        fn bcast<Buf: ?Sized>(buf: &mut Buf, root: Process) -> RmpiResult;
-
+        fn irsend<'b, Buf: ?Sized>(
+            buf: &'b Buf,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult<Request<'b>>
+        where
+            Buf: Buffer;
         #[inline]
         fn recv<Buf: ?Sized>(buf: &mut Buf, src: Process, tag: Tag) -> RmpiResult<Status>
         where
             Buf: Buffer;
 
         #[inline]
+        fn sendrecv<SendBuf: ?Sized, RecvBuf: ?Sized>(
+            sendbuf: &SendBuf,
+            dest: Process,
+            sendtag: Tag,
+            recvbuf: &mut RecvBuf,
+            src: Process,
+            recvtag: Tag,
+        ) -> RmpiResult<Status>
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
+
+        #[inline]
+        fn bcast<Buf: ?Sized>(buf: &mut Buf, root: Process) -> RmpiResult;
+
+        #[inline]
         fn get_count<Datatype>(status: &Status) -> RmpiResult<c_int>
         where
             Datatype: MpiDatatype;
 
+        #[doc = "unsafe, because lifetime is unknown"]
         #[inline]
-        fn buffer_attach(buffer: &'static mut [u8]) -> RmpiResult; //FIXME
+        unsafe fn buffer_attach(buffer: &'static mut [u8]) -> RmpiResult;
+        #[doc = "unsafe, because lifetime is unknown"]
         #[inline]
-        fn buffer_detach() -> RmpiResult<&'static mut [u8]>;
+        unsafe fn buffer_detach() -> RmpiResult<&'static mut [u8]>;
 
         #[inline]
-        fn wait(request: &mut Request) -> RmpiResult<Status>;
+        fn wait(request: Request) -> RmpiResult<(Status, Option<Request>)>;
         #[inline]
         fn waitany(requests: &mut RequestSlice) -> RmpiResult<(usize, Status)>;
         #[inline]
         fn waitall(requests: &mut RequestSlice, responses: &mut [Status]) -> RmpiResult;
 
         #[inline]
-        fn test(request: &mut Request) -> RmpiResult<Option<Status>>;
+        fn test(request: Request) -> RmpiResult<Result<(Status, Option<Request>), Request>>;
         #[inline]
         fn testany(request: &mut RequestSlice) -> RmpiResult<Option<(usize, Status)>>;
 
         #[inline]
         fn request_free(request: Request) -> RmpiResult;
+        #[inline]
+        fn cancel(request: Request) -> RmpiResult;
 
         // should I really use Buffers of different datatypes??
         #[inline]
@@ -143,9 +176,28 @@ pub trait MpiInterceptionLayer {
             RecvBuf: Buffer;
 
         #[inline]
+        fn alltoall<SendBuf: ?Sized, RecvBuf: ?Sized>(
+            sendbuf: &SendBuf,
+            recvbuf: &mut RecvBuf,
+            comm: &Communicator,
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
+        #[inline]
+        fn alltoallv<SendBuf: ?Sized, RecvBuf: ?Sized>(
+            sendbufs: &[&SendBuf],
+            recvbufs: &mut [&mut RecvBuf],
+            comm: &Communicator,
+        ) -> RmpiResult
+        where
+            SendBuf: Buffer,
+            RecvBuf: Buffer;
+
+        #[inline]
         fn reduce<Buf: ?Sized>(
             sendbuf: &Buf,
-            recvbuf: &mut Buf::Single,
+            recvbuf: Option<&mut Buf::Single>,
             op: MpiOp,
             root: Process,
         ) -> RmpiResult

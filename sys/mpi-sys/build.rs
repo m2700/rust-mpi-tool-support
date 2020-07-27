@@ -12,7 +12,7 @@ macro_rules! mtime {
     };
 }
 
-const MPI_TYPES: [&str; 33] = [
+const MPI_TYPES: [&str; 38] = [
     "MPI_Comm",
     "MPI_Datatype",
     "MPI_Aint",
@@ -46,6 +46,11 @@ const MPI_TYPES: [&str; 33] = [
     "MPI_Win_copy_attr_function",
     "MPI_Win_delete_attr_function",
     "MPI_Comm",
+    "LongInt",
+    "DoubleInt",
+    "ShortInt",
+    "TwoInt",
+    "LongDoubleInt",
 ];
 #[cfg(feature = "mpi_functions")]
 const MPI_FUNCTIONS: [&str; 360] = [
@@ -410,7 +415,7 @@ const MPI_FUNCTIONS: [&str; 360] = [
     "MPI_Wtick",
     "MPI_Wtime",
 ];
-const MPI_VARS: [&str; 47] = [
+const MPI_VARS: [&str; 57] = [
     "RUST_MPI_CHAR",
     "RUST_MPI_SIGNED_CHAR",
     "RUST_MPI_UNSIGNED_CHAR",
@@ -458,6 +463,16 @@ const MPI_VARS: [&str; 47] = [
     "RUST_MPI_ANY_TAG",
     "RUST_MPI_REQUEST_NULL",
     "MPI_UNDEFINED",
+    "RUST_MPI_C_COMPLEX",
+    "RUST_MPI_C_FLOAT_COMPLEX",
+    "RUST_MPI_C_DOUBLE_COMPLEX",
+    "RUST_MPI_C_LONG_DOUBLE_COMPLEX",
+    "RUST_MPI_DATATYPE_NULL",
+    "RUST_MPI_LONG_INT",
+    "RUST_MPI_DOUBLE_INT",
+    "RUST_MPI_SHORT_INT",
+    "RUST_MPI_2INT",
+    "RUST_MPI_LONG_DOUBLE_INT",
 ];
 
 fn main() {

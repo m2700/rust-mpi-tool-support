@@ -94,7 +94,7 @@ impl FnItem {
 
 #[proc_macro]
 pub fn impl_tool_helper_fn(input_tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input_tokens=TokenStream::from(input_tokens);
-    let fn_item=FnItem::parse(input_tokens);
+    let input_tokens = TokenStream::from(input_tokens);
+    let fn_item = FnItem::parse(input_tokens);
     unexpected_macro_end!()
 }

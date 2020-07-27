@@ -7,7 +7,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce() -> rmpi::RmpiResult,
     {
-        println!("called finalize");
+        println!("called finalize (high level qmpi)");
         next_f()
     }
 }

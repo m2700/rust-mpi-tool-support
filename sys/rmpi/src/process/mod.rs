@@ -11,7 +11,9 @@ mod isend;
 mod recv;
 mod reduce;
 mod send;
+mod sendrecv;
 
+#[derive(Clone, Copy)]
 pub struct Process<'c> {
     pub(crate) communicator: &'c Communicator,
     pub(crate) rank: c_int,

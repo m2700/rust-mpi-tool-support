@@ -10,12 +10,12 @@ use super::Process;
 impl<'c> Process<'c> {
     tool_mode_item!(
         #[inline]
-        pub unsafe fn isend_with<F, B>(
+        pub unsafe fn isend_with<'b, F, B>(
             &self,
             mpi_isend: F,
-            buffer: &B,
+            buffer: &'b B,
             tag: Tag,
-        ) -> RmpiResult<Request>
+        ) -> RmpiResult<Request<'b>>
         where
             B: Buffer + ?Sized,
             F: FnOnce(
@@ -43,7 +43,11 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn isend<B: Buffer + ?Sized>(&self, buffer: &B, tag: Tag) -> RmpiResult<Request> {
+    pub fn isend<'b, B: Buffer + ?Sized>(
+        &self,
+        buffer: &'b B,
+        tag: Tag,
+    ) -> RmpiResult<Request<'b>> {
         unsafe {
             self.isend_with(
                 |buf, count, datatype, rank, tag, comm, request| {
@@ -57,12 +61,12 @@ impl<'c> Process<'c> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn ibsend_with<F, B>(
+        pub unsafe fn ibsend_with<'b, F, B>(
             &self,
             mpi_ibsend: F,
-            buffer: &B,
+            buffer: &'b B,
             tag: Tag,
-        ) -> RmpiResult<Request>
+        ) -> RmpiResult<Request<'b>>
         where
             B: Buffer + ?Sized,
             F: FnOnce(
@@ -90,7 +94,11 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn ibsend<B: Buffer + ?Sized>(&self, buffer: &B, tag: Tag) -> RmpiResult<Request> {
+    pub fn ibsend<'b, B: Buffer + ?Sized>(
+        &self,
+        buffer: &'b B,
+        tag: Tag,
+    ) -> RmpiResult<Request<'b>> {
         unsafe {
             self.ibsend_with(
                 |buf, count, datatype, rank, tag, comm, request| {
@@ -104,12 +112,12 @@ impl<'c> Process<'c> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn issend_with<F, B>(
+        pub unsafe fn issend_with<'b, F, B>(
             &self,
             mpi_issend: F,
-            buffer: &B,
+            buffer: &'b B,
             tag: Tag,
-        ) -> RmpiResult<Request>
+        ) -> RmpiResult<Request<'b>>
         where
             B: Buffer + ?Sized,
             F: FnOnce(
@@ -137,7 +145,11 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn issend<B: Buffer + ?Sized>(&self, buffer: &B, tag: Tag) -> RmpiResult<Request> {
+    pub fn issend<'b, B: Buffer + ?Sized>(
+        &self,
+        buffer: &'b B,
+        tag: Tag,
+    ) -> RmpiResult<Request<'b>> {
         unsafe {
             self.issend_with(
                 |buf, count, datatype, rank, tag, comm, request| {
@@ -151,12 +163,12 @@ impl<'c> Process<'c> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn irsend_with<F, B>(
+        pub unsafe fn irsend_with<'b, F, B>(
             &self,
             mpi_irsend: F,
-            buffer: &B,
+            buffer: &'b B,
             tag: Tag,
-        ) -> RmpiResult<Request>
+        ) -> RmpiResult<Request<'b>>
         where
             B: Buffer + ?Sized,
             F: FnOnce(
@@ -184,7 +196,11 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn irsend<B: Buffer + ?Sized>(&self, buffer: &B, tag: Tag) -> RmpiResult<Request> {
+    pub fn irsend<'b, B: Buffer + ?Sized>(
+        &self,
+        buffer: &'b B,
+        tag: Tag,
+    ) -> RmpiResult<Request<'b>> {
         unsafe {
             self.irsend_with(
                 |buf, count, datatype, rank, tag, comm, request| {

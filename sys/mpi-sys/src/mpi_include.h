@@ -1,4 +1,6 @@
-#include<mpi.h>
+#include <mpi.h>
+
+const MPI_Datatype RUST_MPI_DATATYPE_NULL = MPI_DATATYPE_NULL;
 
 const MPI_Datatype RUST_MPI_CHAR = MPI_CHAR;
 const MPI_Datatype RUST_MPI_SIGNED_CHAR = MPI_SIGNED_CHAR;
@@ -30,6 +32,46 @@ const MPI_Datatype RUST_UINT8_T = MPI_UINT8_T;
 const MPI_Datatype RUST_UINT16_T = MPI_UINT16_T;
 const MPI_Datatype RUST_UINT32_T = MPI_UINT32_T;
 const MPI_Datatype RUST_UINT64_T = MPI_UINT64_T;
+
+const MPI_Datatype RUST_MPI_C_COMPLEX = MPI_C_COMPLEX;
+const MPI_Datatype RUST_MPI_C_FLOAT_COMPLEX = MPI_C_FLOAT_COMPLEX;
+const MPI_Datatype RUST_MPI_C_DOUBLE_COMPLEX = MPI_C_DOUBLE_COMPLEX;
+const MPI_Datatype RUST_MPI_C_LONG_DOUBLE_COMPLEX = MPI_C_LONG_DOUBLE_COMPLEX;
+
+const MPI_Datatype RUST_MPI_LONG_INT = MPI_LONG_INT;
+struct LongInt
+{
+    long l;
+    int i;
+};
+
+const MPI_Datatype RUST_MPI_DOUBLE_INT = MPI_DOUBLE_INT;
+struct DoubleInt
+{
+    double d;
+    int i;
+};
+
+const MPI_Datatype RUST_MPI_SHORT_INT = MPI_SHORT_INT;
+struct ShortInt
+{
+    short s;
+    int i;
+};
+
+const MPI_Datatype RUST_MPI_2INT = MPI_2INT;
+struct TwoInt
+{
+    int i1;
+    int i2;
+};
+
+const MPI_Datatype RUST_MPI_LONG_DOUBLE_INT = MPI_LONG_DOUBLE_INT;
+struct LongDoubleInt
+{
+    long double ld;
+    int i;
+};
 
 const MPI_Comm RUST_MPI_COMM_NULL = MPI_COMM_NULL;
 const MPI_Comm RUST_MPI_COMM_WORLD = MPI_COMM_WORLD;

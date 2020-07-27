@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 mpi-sys = { path = "../mpi-sys", features = ["mpi_functions"] }
+cnum = { path = "../cnum" }
 
 [features]
 # link against mpi and therefore expose all mpi functions

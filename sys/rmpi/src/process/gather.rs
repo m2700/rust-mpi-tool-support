@@ -86,7 +86,9 @@ impl<'c> Process<'c> {
                 MPI_Comm,
             ) -> c_int,
         {
-            debug_assert_eq!(Ok(recv_buffers.len() as c_int), self.communicator.size());
+            if self.communicator.current_rank()? == self.rank {
+                debug_assert_eq!(recv_buffers.len() as c_int, self.communicator.size()?);
+            }
 
             let (sendbuf, sendcount) = send_buffer.into_raw();
 
@@ -95,7 +97,7 @@ impl<'c> Process<'c> {
                 .map(|recv_buffer| recv_buffer.as_mut_ptr())
                 .min()
                 .unwrap();
-            let recv_datatype = recv_buffers[0].item_datatype();
+            let recv_datatype = recv_buffers.get(0).map(|buf|buf.item_datatype()).unwrap_or(0);
             debug_assert!(recv_buffers
                 .iter()
                 .all(|buf| buf.item_datatype() == recv_datatype));

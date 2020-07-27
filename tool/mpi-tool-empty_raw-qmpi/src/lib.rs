@@ -8,7 +8,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce() -> c_int,
     {
-        println!("called finalize");
+        println!("called finalize (raw qmpi)");
         (unsafe { next_f.unwrap() })()
     }
 }

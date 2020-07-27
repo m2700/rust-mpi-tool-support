@@ -83,13 +83,6 @@ where
     unsafe { next_f.unwrap()(source, tag, comm, status) }
 }
 #[inline]
-fn cancel<F>(next_f: UnsafeBox<F>, request: *mut MPI_Request) -> c_int
-where
-    F: FnOnce(*mut MPI_Request) -> c_int,
-{
-    unsafe { next_f.unwrap()(request) }
-}
-#[inline]
 fn test_cancelled<F>(next_f: UnsafeBox<F>, status: *const MPI_Status, flag: *mut c_int) -> c_int
 where
     F: FnOnce(*const MPI_Status, *mut c_int) -> c_int,
@@ -221,45 +214,6 @@ where
     F: FnOnce(c_int, *mut MPI_Request) -> c_int,
 {
     unsafe { next_f.unwrap()(count, array_of_requests) }
-}
-#[inline]
-fn sendrecv<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    sendcount: c_int,
-    sendtype: MPI_Datatype,
-    dest: c_int,
-    sendtag: c_int,
-    recvbuf: *mut c_void,
-    recvcount: c_int,
-    recvtype: MPI_Datatype,
-    source: c_int,
-    recvtag: c_int,
-    comm: MPI_Comm,
-    status: *mut MPI_Status,
-) -> c_int
-where
-    F: FnOnce(
-        *const c_void,
-        c_int,
-        MPI_Datatype,
-        c_int,
-        c_int,
-        *mut c_void,
-        c_int,
-        MPI_Datatype,
-        c_int,
-        c_int,
-        MPI_Comm,
-        *mut MPI_Status,
-    ) -> c_int,
-{
-    unsafe {
-        next_f.unwrap()(
-            sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source,
-            recvtag, comm, status,
-        )
-    }
 }
 #[inline]
 fn sendrecv_replace<F>(
@@ -522,20 +476,6 @@ where
     unsafe { next_f.unwrap()(incount, datatype, comm, size) }
 }
 #[inline]
-fn bcast<F>(
-    next_f: UnsafeBox<F>,
-    buffer: *mut c_void,
-    count: c_int,
-    datatype: MPI_Datatype,
-    root: c_int,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(*mut c_void, c_int, MPI_Datatype, c_int, MPI_Comm) -> c_int,
-{
-    unsafe { next_f.unwrap()(buffer, count, datatype, root, comm) }
-}
-#[inline]
 fn scatter<F>(
     next_f: UnsafeBox<F>,
     sendbuf: *const c_void,
@@ -594,124 +534,6 @@ where
     unsafe {
         next_f.unwrap()(
             sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, comm,
-        )
-    }
-}
-#[inline]
-fn allgather<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    sendcount: c_int,
-    sendtype: MPI_Datatype,
-    recvbuf: *mut c_void,
-    recvcount: c_int,
-    recvtype: MPI_Datatype,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(
-        *const c_void,
-        c_int,
-        MPI_Datatype,
-        *mut c_void,
-        c_int,
-        MPI_Datatype,
-        MPI_Comm,
-    ) -> c_int,
-{
-    unsafe {
-        next_f.unwrap()(
-            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
-        )
-    }
-}
-#[inline]
-fn allgatherv<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    sendcount: c_int,
-    sendtype: MPI_Datatype,
-    recvbuf: *mut c_void,
-    recvcounts: *const c_int,
-    displs: *const c_int,
-    recvtype: MPI_Datatype,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(
-        *const c_void,
-        c_int,
-        MPI_Datatype,
-        *mut c_void,
-        *const c_int,
-        *const c_int,
-        MPI_Datatype,
-        MPI_Comm,
-    ) -> c_int,
-{
-    unsafe {
-        next_f.unwrap()(
-            sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm,
-        )
-    }
-}
-#[inline]
-fn alltoall<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    sendcount: c_int,
-    sendtype: MPI_Datatype,
-    recvbuf: *mut c_void,
-    recvcount: c_int,
-    recvtype: MPI_Datatype,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(
-        *const c_void,
-        c_int,
-        MPI_Datatype,
-        *mut c_void,
-        c_int,
-        MPI_Datatype,
-        MPI_Comm,
-    ) -> c_int,
-{
-    unsafe {
-        next_f.unwrap()(
-            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
-        )
-    }
-}
-#[inline]
-fn alltoallv<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    sendcounts: *const c_int,
-    sdispls: *const c_int,
-    sendtype: MPI_Datatype,
-    recvbuf: *mut c_void,
-    recvcounts: *const c_int,
-    rdispls: *const c_int,
-    recvtype: MPI_Datatype,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(
-        *const c_void,
-        *const c_int,
-        *const c_int,
-        MPI_Datatype,
-        *mut c_void,
-        *const c_int,
-        *const c_int,
-        MPI_Datatype,
-        MPI_Comm,
-    ) -> c_int,
-{
-    unsafe {
-        next_f.unwrap()(
-            sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype, comm,
         )
     }
 }
@@ -947,13 +769,6 @@ where
     F: FnOnce(MPI_Group, c_int, *mut [c_int; 3usize], *mut MPI_Group) -> c_int,
 {
     unsafe { next_f.unwrap()(group, n, ranges, newgroup) }
-}
-#[inline]
-fn group_free<F>(next_f: UnsafeBox<F>, group: *mut MPI_Group) -> c_int
-where
-    F: FnOnce(*mut MPI_Group) -> c_int,
-{
-    unsafe { next_f.unwrap()(group) }
 }
 #[inline]
 fn comm_compare<F>(
@@ -1380,39 +1195,11 @@ where
     unsafe { next_f.unwrap()(errorcode, errorclass) }
 }
 #[inline]
-fn init<F>(next_f: UnsafeBox<F>, argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_int
-where
-    F: FnOnce(*mut c_int, *mut *mut *mut c_char) -> c_int,
-{
-    unsafe { next_f.unwrap()(argc, argv) }
-}
-#[inline]
-fn finalize<F>(next_f: UnsafeBox<F>) -> c_int
-where
-    F: FnOnce() -> c_int,
-{
-    unsafe { next_f.unwrap()() }
-}
-#[inline]
-fn initialized<F>(next_f: UnsafeBox<F>, flag: *mut c_int) -> c_int
-where
-    F: FnOnce(*mut c_int) -> c_int,
-{
-    unsafe { next_f.unwrap()(flag) }
-}
-#[inline]
 fn abort<F>(next_f: UnsafeBox<F>, comm: MPI_Comm, errorcode: c_int) -> c_int
 where
     F: FnOnce(MPI_Comm, c_int) -> c_int,
 {
     unsafe { next_f.unwrap()(comm, errorcode) }
-}
-#[inline]
-fn pcontrol<F>(next_f: UnsafeBox<F>, level: c_int) -> c_int
-where
-    F: FnOnce(c_int) -> c_int,
-{
-    unsafe { next_f.unwrap()(level) }
 }
 #[inline]
 fn close_port<F>(next_f: UnsafeBox<F>, port_name: *const c_char) -> c_int
@@ -2652,13 +2439,6 @@ where
     F: FnOnce(MPI_File, MPI_Errhandler) -> c_int,
 {
     unsafe { next_f.unwrap()(file, errhandler) }
-}
-#[inline]
-fn finalized<F>(next_f: UnsafeBox<F>, flag: *mut c_int) -> c_int
-where
-    F: FnOnce(*mut c_int) -> c_int,
-{
-    unsafe { next_f.unwrap()(flag) }
 }
 #[inline]
 fn free_mem<F>(next_f: UnsafeBox<F>, base: *mut c_void) -> c_int

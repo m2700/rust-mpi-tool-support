@@ -26,13 +26,12 @@ enum ArgumentDecl {
         buf_ptr_type: syn::Type,
         opt_comma: Option<Punct>,
     },
-    
 }
 impl ArgumentDecl {
     fn parse(token_stream: Vec<TokenTree>, opt_comma: Option<Punct>) -> Self {
         let mut state = Begin;
         let mut token_stream_iter = token_stream.into_iter();
-        for token in&mut token_stream_iter {
+        for token in &mut token_stream_iter {
             state = match state {
                 Begin => match token {
                     TokenTree::Ident(buffer_ptr) if buffer_ptr.to_string() == "buffer_ptr" => {

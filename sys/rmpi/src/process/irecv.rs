@@ -10,12 +10,12 @@ use super::Process;
 impl<'c> Process<'c> {
     tool_mode_item!(
         #[inline]
-        pub unsafe fn irecv_with<F, B>(
+        pub unsafe fn irecv_with<'b, F, B>(
             &self,
             mpi_irecv: F,
-            buffer: &mut B,
+            buffer: &'b mut B,
             tag: Tag,
-        ) -> RmpiResult<Request>
+        ) -> RmpiResult<Request<'b>>
         where
             B: Buffer + ?Sized,
             F: FnOnce(
@@ -43,7 +43,11 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn irecv<B: Buffer + ?Sized>(&self, buffer: &mut B, tag: Tag) -> RmpiResult<Request> {
+    pub fn irecv<'b, B: Buffer + ?Sized>(
+        &self,
+        buffer: &'b mut B,
+        tag: Tag,
+    ) -> RmpiResult<Request<'b>> {
         unsafe {
             self.irecv_with(
                 |buf, count, datatype, rank, tag, comm, status| {

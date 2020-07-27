@@ -4,7 +4,7 @@ use rmpi::pmpi_mode as rmpi;
 struct MyPmpiLayer;
 impl MpiInterceptionLayer for MyPmpiLayer {
     fn finalize<F>(next_f:F)->rmpi::RmpiResult where F:FnOnce()->rmpi::RmpiResult{
-        println!("called finalize");
+        println!("called finalize (high level pmpi)");
         next_f()
     }
 }

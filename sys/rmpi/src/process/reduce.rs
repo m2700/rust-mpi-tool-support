@@ -1,4 +1,4 @@
-use std::os::raw::*;
+use std::{os::raw::*, ptr};
 
 local_mod!(
     use mpi_sys::*;
@@ -14,7 +14,7 @@ impl<'c> Process<'c> {
             &self,
             mpi_reduce: F,
             send_buffer: &B,
-            recv_buffer: &mut B::Single,
+            recv_buffer: Option<&mut B::Single>,
             op: MpiOp,
         ) -> RmpiResult
         where
@@ -30,7 +30,9 @@ impl<'c> Process<'c> {
             ) -> c_int,
         {
             let (sendbuf, sendcount) = send_buffer.into_raw();
-            let (recvbuf, _recvcount) = recv_buffer.into_raw_mut();
+            let recvbuf = recv_buffer
+                .map(|rb| rb.into_raw_mut().0)
+                .unwrap_or(ptr::null_mut());
 
             Error::from_mpi_res(mpi_reduce(
                 sendbuf,
@@ -47,7 +49,7 @@ impl<'c> Process<'c> {
     pub fn reduce<B: Buffer + ?Sized>(
         &self,
         send_buffer: &B,
-        recv_buffer: &mut B::Single,
+        recv_buffer: Option<&mut B::Single>,
         op: MpiOp,
     ) -> RmpiResult {
         unsafe {

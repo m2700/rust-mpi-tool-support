@@ -15,6 +15,7 @@ macro_rules! tool_mode_item {
 
 mod buffer;
 mod communicator;
+mod context;
 mod error;
 mod group;
 mod mpi_op;
@@ -23,11 +24,7 @@ pub mod request;
 mod status;
 mod tag;
 
-pub use buffer::{Buffer, MpiDatatype, SingleBuffer};
-pub use communicator::Communicator;
-pub use error::{Error, RmpiResult};
-pub use group::Group;
-pub use mpi_op::MpiOp;
-pub use process::Process;
-pub use status::Status;
-pub use tag::Tag;
+pub use self::{
+    buffer::*, communicator::*, context::*, error::*, group::*, mpi_op::*, process::*, status::*,
+    tag::*,
+};

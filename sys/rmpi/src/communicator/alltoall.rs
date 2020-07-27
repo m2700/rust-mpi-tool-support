@@ -10,9 +10,9 @@ use super::Communicator;
 impl Communicator {
     tool_mode_item!(
         #[inline]
-        pub unsafe fn allgather_with<F, SB, RB>(
+        pub unsafe fn alltoall_with<F, SB, RB>(
             &self,
-            mpi_allgather: F,
+            mpi_alltoall: F,
             send_buffer: &SB,
             recv_buffer: &mut RB,
         ) -> RmpiResult
@@ -31,7 +31,7 @@ impl Communicator {
         {
             let (sendbuf, sendcount) = send_buffer.into_raw();
             let (recvbuf, recvcount) = recv_buffer.into_raw_mut();
-            Error::from_mpi_res(mpi_allgather(
+            Error::from_mpi_res(mpi_alltoall(
                 sendbuf,
                 sendcount,
                 send_buffer.item_datatype(),
@@ -43,15 +43,15 @@ impl Communicator {
         }
     );
     #[inline]
-    pub fn allgather<SB: Buffer + ?Sized, RB: Buffer + ?Sized>(
+    pub fn alltoall<SB: Buffer + ?Sized, RB: Buffer + ?Sized>(
         &self,
         send_buffer: &SB,
         recv_buffer: &mut RB,
     ) -> RmpiResult {
         unsafe {
-            self.allgather_with(
+            self.alltoall_with(
                 |sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm| {
-                    MPI_Allgather(
+                    MPI_Alltoall(
                         sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
                     )
                 },
@@ -63,10 +63,10 @@ impl Communicator {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn allgatherv_with<F, SB, RB>(
+        pub unsafe fn alltoallv_with<F, SB, RB>(
             &self,
-            mpi_allgatherv: F,
-            send_buffer: &SB,
+            mpi_alltoallv: F,
+            send_buffers: & [& SB],
             recv_buffers: &mut [&mut RB],
         ) -> RmpiResult
         where
@@ -74,7 +74,8 @@ impl Communicator {
             RB: Buffer + ?Sized,
             F: FnOnce(
                 *const c_void,
-                c_int,
+                *const c_int,
+                *const c_int,
                 MPI_Datatype,
                 *mut c_void,
                 *const c_int,
@@ -83,9 +84,24 @@ impl Communicator {
                 MPI_Comm,
             ) -> c_int,
         {
-            debug_assert_eq!(recv_buffers.len() as c_int, self.size()?);
+            let sendbuf_ptr = send_buffers
+                .iter()
+                .map(|send_buffer| send_buffer.as_ptr())
+                .min()
+                .unwrap();
+            let send_datatype = send_buffers[0].item_datatype();
+            debug_assert!(send_buffers
+                .iter()
+                .all(|buf| buf.item_datatype() == send_datatype));
 
-            let (sendbuf, sendcount) = send_buffer.into_raw();
+            let [mut send_displs, mut send_counts] = [vec![], vec![]];
+            for (sendbuf, sendcount) in send_buffers
+                .iter()
+                .map(|send_buffer| (send_buffer.as_ptr(), send_buffer.len()))
+            {
+                send_displs.push(((sendbuf as usize) - (sendbuf_ptr as usize)) as c_int);
+                send_counts.push(sendcount as c_int);
+            }
 
             let recvbuf_ptr = recv_buffers
                 .iter_mut()
@@ -106,10 +122,11 @@ impl Communicator {
                 recv_counts.push(recvcount as c_int);
             }
 
-            Error::from_mpi_res(mpi_allgatherv(
-                sendbuf,
-                sendcount,
-                send_buffer.item_datatype(),
+            Error::from_mpi_res(mpi_alltoallv(
+                sendbuf_ptr as *const c_void,
+                send_counts.as_ptr(),
+                send_displs.as_ptr(),
+                send_datatype,
                 recvbuf_ptr as *mut c_void,
                 recv_counts.as_ptr(),
                 recv_displs.as_ptr(),
@@ -119,19 +136,28 @@ impl Communicator {
         }
     );
     #[inline]
-    pub fn allgatherv<SB: Buffer + ?Sized, RB: Buffer + ?Sized>(
+    pub fn alltoallv<SB: Buffer + ?Sized, RB: Buffer + ?Sized>(
         &self,
-        send_buffer: &SB,
+        send_buffers: & [& SB],
         recv_buffers: &mut [&mut RB],
     ) -> RmpiResult {
         unsafe {
-            self.allgatherv_with(
-                |sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm| {
-                    MPI_Allgatherv(
-                        sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm,
+            self.alltoallv_with(
+                |sendbuf,
+                 sendcounts,
+                 sdispls,
+                 sendtype,
+                 recvbuf,
+                 recvcounts,
+                 rdispls,
+                 recvtype,
+                 comm| {
+                    MPI_Alltoallv(
+                        sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls,
+                        recvtype, comm,
                     )
                 },
-                send_buffer,
+                send_buffers,
                 recv_buffers,
             )
         }
