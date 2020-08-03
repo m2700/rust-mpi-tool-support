@@ -1,2 +1,9 @@
 [workspace]
 members = ["*mpi-tool-creator", "mpi-tool*", "mpi-tool-layer"]
+
+[profile.release]
+opt-level = 0
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = false

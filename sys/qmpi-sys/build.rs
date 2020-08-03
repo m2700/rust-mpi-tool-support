@@ -1,13 +1,17 @@
 use std::{
     env,
-    fs::{create_dir, metadata, File},
-    io::{ErrorKind as IOErrorKind, Write},
+    fs::{create_dir, metadata},
+    io::ErrorKind as IOErrorKind,
     path::{Path, PathBuf},
     process::Command,
     str::from_utf8,
 };
+#[cfg(any(feature = "use_git_header", feature = "bundled"))]
+use std::{fs::File, io::Write};
 
+#[cfg(any(feature = "use_git_header", feature = "bundled"))]
 use hyper::{body::HttpBody, Client, Uri};
+#[cfg(any(feature = "use_git_header", feature = "bundled"))]
 use hyper_rustls::HttpsConnector;
 #[cfg(feature = "bundled")]
 use tokio::join as tokio_join; // fixes highlightning issue
@@ -26,6 +30,8 @@ fn prepare_dir(path: &Path) {
         })
         .unwrap();
 }
+
+#[cfg(any(feature = "use_git_header", feature = "bundled"))]
 async fn download_file(uri: Uri, file_path: &Path, patch: &[[&str; 2]]) {
     if !file_path.exists() || mtime!(file_path) < mtime!("build.rs") {
         let https_client: Client<_, hyper::Body> = Client::builder().build(HttpsConnector::new());
@@ -46,20 +52,9 @@ async fn download_file(uri: Uri, file_path: &Path, patch: &[[&str; 2]]) {
     }
 }
 
-#[cfg(feature = "bundled")]
-const QMPI_C_PATCH: [[&str; 2]; 2] = [
-    [
-        "int ret= ((_wtick_func)f_dl) (new_level, &v);",
-        "double ret= ((_wtick_func)f_dl) (new_level, &v);",
-    ],
-    [
-        "int ret= ((_wtime_func) f_dl) (new_level, &v);",
-        "double ret= ((_wtime_func) f_dl) (new_level, &v);",
-    ],
-];
-
 #[tokio::main]
 async fn main() {
+    #[cfg(feature = "use_git_header")]
     let qmpi_h_uri = "https://raw.githubusercontent.com/caps-tum/qmpi/master/qmpi.h"
         .parse()
         .unwrap();
@@ -75,6 +70,7 @@ async fn main() {
     let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
     let qmpi_root_path = Path::new("qmpi");
 
+    #[cfg(feature = "use_git_header")]
     let qmpi_h_path = qmpi_root_path.join("qmpi.h");
     #[cfg(feature = "bundled")]
     let qmpi_c_path = qmpi_root_path.join("qmpi.c");
@@ -101,10 +97,10 @@ async fn main() {
     #[cfg(feature = "bundled")]
     tokio_join!(
         download_file(qmpi_h_uri, &qmpi_h_path, &[]),
-        download_file(qmpi_c_uri, &qmpi_c_path, &QMPI_C_PATCH),
+        download_file(qmpi_c_uri, &qmpi_c_path, &[]),
         download_file(qmpi_arrays_h_uri, &qmpi_arrays_h_path, &[])
     );
-    #[cfg(not(feature = "bundled"))]
+    #[cfg(all(not(feature = "bundled"), feature = "use_git_header"))]
     download_file(qmpi_h_uri, &qmpi_h_path, &[]).await;
 
     #[cfg(feature = "bundled")]
@@ -119,6 +115,8 @@ async fn main() {
         .warnings(false)
         .extra_warnings(false)
         .compile("qmpi");
+    #[cfg(not(feature = "bundled"))]
+    println!("cargo:rustc-link-lib=qmpi");
 
     if !qmpi_bindings_path.exists() || mtime!(&qmpi_bindings_path) < mtime!("build.rs") {
         let mpicc_output = Command::new("mpicc")
@@ -134,9 +132,14 @@ async fn main() {
         })
         .unwrap();
 
-        #[allow(unused_mut)]
-        bindgen::builder()
-            .header(qmpi_h_path.to_str().unwrap())
+        #[cfg(feature = "use_git_header")]
+        let bindgen_builder = bindgen::builder().header(qmpi_h_path.to_str().unwrap());
+        #[cfg(not(feature = "use_git_header"))]
+        let bindgen_builder =
+            bindgen::builder().header_contents("qmpi_include.h", "#include <qmpi.h>");
+
+        // #[allow(unused_mut)]
+        bindgen_builder
             .clang_args(mpicc_args.split(' '))
             .default_enum_style(bindgen::EnumVariation::Rust {
                 non_exhaustive: true,
@@ -147,6 +150,7 @@ async fn main() {
             .whitelist_type("mpi_func")
             .whitelist_function("vector_get")
             .whitelist_function("QMPI_Table_query")
+            .whitelist_function("query_next_function")
             .generate()
             .unwrap()
             .write_to_file(qmpi_bindings_path)

@@ -11,7 +11,5 @@ mpi-sys = { path = "../mpi-sys", features = ["mpi_functions"] }
 cnum = { path = "../cnum" }
 
 [features]
-# link against mpi and therefore expose all mpi functions
-link_mpi = ["mpi-sys/link_mpi"]
 # remap PMPI_* functions as MPI_*
 tool_mode = ["mpi-sys/tool_mode"]

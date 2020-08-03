@@ -1,3 +1,5 @@
+use std::env;
+
 use mpi_tool_layer::MpiInterceptionLayer;
 use rmpi::pmpi_mode as rmpi;
 
@@ -7,7 +9,10 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce() -> rmpi::RmpiResult,
     {
-        println!("called finalize (high level qmpi)");
+        let fin_dbg_cnf = env::var("FINALIZE_DEBUG_CONFIRM");
+        if fin_dbg_cnf.is_err() || fin_dbg_cnf.as_ref().map(|s| &**s) == Ok("1") {
+            println!("called finalize (high level qmpi)");
+        }
         next_f()
     }
 }

@@ -15,7 +15,5 @@ bindgen = "*"
 [features]
 # expose MPI_* functions
 mpi_functions = []
-# link against mpi and therefore expose all mpi functions
-link_mpi = []
 # remap PMPI_* functions as MPI_*
 tool_mode = []

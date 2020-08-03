@@ -8,6 +8,8 @@ edition = "2018"
 
 
 [dependencies]
-# QMPI_Table_query and vector_get are double linked ("bundled" should not be here, but Rust can't do any better)
-qmpi-sys = { path = "../../sys/qmpi-sys", features = ["export_mpi", "bundled", "tool_mode"] }
+qmpi-sys = { path = "../../sys/qmpi-sys", features = ["export_mpi", "tool_mode"] }
 mpi-tool-layer = { path = "../mpi-tool-layer" }
+
+[features]
+qmpi_bundled = ["qmpi-sys/bundled"]

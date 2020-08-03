@@ -1,4 +1,4 @@
-use std::os::raw::c_int;
+use std::{env, os::raw::c_int};
 
 use mpi_tool_layer::{RawMpiInterceptionLayer, UnsafeBox};
 
@@ -8,7 +8,10 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce() -> c_int,
     {
-        println!("called finalize (raw qmpi)");
+        let fin_dbg_cnf = env::var("FINALIZE_DEBUG_CONFIRM");
+        if fin_dbg_cnf.is_err() || fin_dbg_cnf.as_ref().map(|s| &**s) == Ok("1") {
+            println!("called finalize (raw qmpi)");
+        }
         (unsafe { next_f.unwrap() })()
     }
 }
