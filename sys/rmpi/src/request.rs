@@ -38,14 +38,28 @@ impl<'b> Request<'b> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn wait_with<F>(mut self, mpi_wait: F) -> RmpiResult<(Status, Option<Self>)>
+        pub unsafe fn wait_with<F>(
+            mut self,
+            mpi_wait: F,
+            status_ignore: bool,
+        ) -> RmpiResult<(Option<Status>, Option<Self>)>
         where
             F: FnOnce(*mut MPI_Request, *mut MPI_Status) -> c_int,
         {
-            let mut status = MaybeUninit::uninit();
-            match Error::from_mpi_res(mpi_wait(&mut self.0, status.as_mut_ptr())) {
+            let mut status = if status_ignore {
+                None
+            } else {
+                Some(MaybeUninit::uninit())
+            };
+            match Error::from_mpi_res(mpi_wait(
+                &mut self.0,
+                status
+                    .as_mut()
+                    .map(|s| s.as_mut_ptr())
+                    .unwrap_or(MPI_STATUS_IGNORE),
+            )) {
                 Ok(()) => Ok((
-                    Status::from_raw(status.assume_init()),
+                    status.map(|s| Status::from_raw(s.assume_init())),
                     if self.0 == MPI_REQUEST_NULL {
                         forget(self);
                         None
@@ -61,8 +75,8 @@ impl<'b> Request<'b> {
         }
     );
     #[inline]
-    pub fn wait(self) -> RmpiResult<(Status, Option<Self>)> {
-        unsafe { self.wait_with(|request, status| MPI_Wait(request, status)) }
+    pub fn wait(self, status_ignore: bool) -> RmpiResult<(Option<Status>, Option<Self>)> {
+        unsafe { self.wait_with(|request, status| MPI_Wait(request, status), status_ignore) }
     }
 
     tool_mode_item!(
@@ -70,16 +84,28 @@ impl<'b> Request<'b> {
         pub unsafe fn test_with<F>(
             mut self,
             mpi_test: F,
-        ) -> RmpiResult<Result<(Status, Option<Self>), Self>>
+            status_ignore: bool,
+        ) -> RmpiResult<Result<(Option<Status>, Option<Self>), Self>>
         where
             F: FnOnce(*mut MPI_Request, *mut c_int, *mut MPI_Status) -> c_int,
         {
-            let mut status = MaybeUninit::uninit();
+            let mut status = if status_ignore {
+                None
+            } else {
+                Some(MaybeUninit::uninit())
+            };
             let mut flag = 0;
-            match Error::from_mpi_res(mpi_test(&mut self.0, &mut flag, status.as_mut_ptr())) {
+            match Error::from_mpi_res(mpi_test(
+                &mut self.0,
+                &mut flag,
+                status
+                    .as_mut()
+                    .map(|s| s.as_mut_ptr())
+                    .unwrap_or(MPI_STATUS_IGNORE),
+            )) {
                 Ok(()) => Ok(if flag != 0 {
                     Ok((
-                        Status::from_raw(status.assume_init()),
+                        status.map(|s| Status::from_raw(s.assume_init())),
                         if self.0 == MPI_REQUEST_NULL {
                             forget(self);
                             None
@@ -98,8 +124,16 @@ impl<'b> Request<'b> {
         }
     );
     #[inline]
-    pub fn test(self) -> RmpiResult<Result<(Status, Option<Self>), Self>> {
-        unsafe { self.test_with(|request, flag, status| MPI_Test(request, flag, status)) }
+    pub fn test(
+        self,
+        status_ignore: bool,
+    ) -> RmpiResult<Result<(Option<Status>, Option<Self>), Self>> {
+        unsafe {
+            self.test_with(
+                |request, flag, status| MPI_Test(request, flag, status),
+                status_ignore,
+            )
+        }
     }
 
     tool_mode_item!(
@@ -168,27 +202,46 @@ impl<'b> RequestSlice<'b> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn waitany_with<F>(&mut self, mpi_waitany: F) -> RmpiResult<(usize, Status)>
+        pub unsafe fn waitany_with<F>(
+            &mut self,
+            mpi_waitany: F,
+            status_ignore: bool,
+        ) -> RmpiResult<(usize, Option<Status>)>
         where
             F: FnOnce(c_int, *mut MPI_Request, *mut c_int, *mut MPI_Status) -> c_int,
         {
             let mut indx = 0;
-            let mut status = MaybeUninit::uninit();
+            let mut status = if status_ignore {
+                None
+            } else {
+                Some(MaybeUninit::uninit())
+            };
             Error::from_mpi_res(mpi_waitany(
                 self.1.len() as c_int,
                 self.1.as_mut_ptr(),
                 &mut indx,
-                status.as_mut_ptr(),
+                status
+                    .as_mut()
+                    .map(|s| s.as_mut_ptr())
+                    .unwrap_or(MPI_STATUS_IGNORE),
             ))
-            .map(|()| (indx as usize, Status::from_raw(status.assume_init())))
+            .map(|()| {
+                (
+                    indx as usize,
+                    status.map(|s| Status::from_raw(s.assume_init())),
+                )
+            })
         }
     );
     #[inline]
-    pub fn waitany(&mut self) -> RmpiResult<(usize, Status)> {
+    pub fn waitany(&mut self, status_ignore: bool) -> RmpiResult<(usize, Option<Status>)> {
         unsafe {
-            self.waitany_with(|count, array_of_requests, indx, status| {
-                MPI_Waitany(count, array_of_requests, indx, status)
-            })
+            self.waitany_with(
+                |count, array_of_requests, indx, status| {
+                    MPI_Waitany(count, array_of_requests, indx, status)
+                },
+                status_ignore,
+            )
         }
     }
 
@@ -197,23 +250,34 @@ impl<'b> RequestSlice<'b> {
         pub unsafe fn testany_with<F>(
             &mut self,
             mpi_testany: F,
-        ) -> RmpiResult<Option<(usize, Status)>>
+            status_ignore: bool,
+        ) -> RmpiResult<Option<(usize, Option<Status>)>>
         where
             F: FnOnce(c_int, *mut MPI_Request, *mut c_int, *mut c_int, *mut MPI_Status) -> c_int,
         {
             let mut indx = 0;
             let mut flag = 0;
-            let mut status = MaybeUninit::uninit();
+            let mut status = if status_ignore {
+                None
+            } else {
+                Some(MaybeUninit::uninit())
+            };
             Error::from_mpi_res(mpi_testany(
                 self.1.len() as c_int,
                 self.1.as_mut_ptr(),
                 &mut indx,
                 &mut flag,
-                status.as_mut_ptr(),
+                status
+                    .as_mut()
+                    .map(|s| s.as_mut_ptr())
+                    .unwrap_or(MPI_STATUS_IGNORE),
             ))
             .map(|()| {
                 if flag != 0 {
-                    Some((indx as usize, Status::from_raw(status.assume_init())))
+                    Some((
+                        indx as usize,
+                        status.map(|s| Status::from_raw(s.assume_init())),
+                    ))
                 } else {
                     None
                 }
@@ -221,34 +285,46 @@ impl<'b> RequestSlice<'b> {
         }
     );
     #[inline]
-    pub fn testany(&mut self) -> RmpiResult<Option<(usize, Status)>> {
+    pub fn testany(&mut self, status_ignore: bool) -> RmpiResult<Option<(usize, Option<Status>)>> {
         unsafe {
-            self.testany_with(|count, array_of_requests, indx, flag, status| {
-                MPI_Testany(count, array_of_requests, indx, flag, status)
-            })
+            self.testany_with(
+                |count, array_of_requests, indx, flag, status| {
+                    MPI_Testany(count, array_of_requests, indx, flag, status)
+                },
+                status_ignore,
+            )
         }
     }
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn waitall_with<F>(
+        pub unsafe fn waitall_with<'st, F>(
             &mut self,
             mpi_waitall: F,
-            statuses: &mut [Status],
-        ) -> RmpiResult
+            statuses: &'st mut [MaybeUninit<Status>],
+        ) -> RmpiResult<&'st mut [Status]>
         where
             F: FnOnce(c_int, *mut MPI_Request, *mut MPI_Status) -> c_int,
         {
-            debug_assert_eq!(self.len(), statuses.len());
+            let raw_statuses = if statuses.is_empty() {
+                MPI_STATUSES_IGNORE
+            } else {
+                debug_assert_eq!(self.len(), statuses.len());
+                Status::as_maybe_uninit_ptr_mut(statuses)
+            };
             Error::from_mpi_res(mpi_waitall(
                 self.1.len() as c_int,
                 self.1.as_mut_ptr(),
-                Status::into_raw_slice_mut(statuses).as_mut_ptr(),
+                raw_statuses,
             ))
+            .map(|()| transmute::<&mut [MaybeUninit<Status>], &mut [Status]>(statuses))
         }
     );
     #[inline]
-    pub fn waitall(&mut self, statuses: &mut [Status]) -> RmpiResult {
+    pub fn waitall<'st>(
+        &mut self,
+        statuses: &'st mut [MaybeUninit<Status>],
+    ) -> RmpiResult<&'st mut [Status]> {
         unsafe {
             self.waitall_with(
                 |count, array_of_requests, array_of_statuses| {

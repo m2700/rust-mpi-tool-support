@@ -2,7 +2,7 @@ use std::os::raw::*;
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{request::Request, Buffer, Error, RmpiResult, Tag};
+    use crate::{request::Request, BufferRef, Error, RmpiResult, Tag};
 );
 
 use super::Process;
@@ -10,14 +10,14 @@ use super::Process;
 impl<'c> Process<'c> {
     tool_mode_item!(
         #[inline]
-        pub unsafe fn isend_with<'b, F, B>(
+        pub unsafe fn isend_with<'b, F, B: 'b>(
             &self,
             mpi_isend: F,
-            buffer: &'b B,
+            buffer: B,
             tag: Tag,
         ) -> RmpiResult<Request<'b>>
         where
-            B: Buffer + ?Sized,
+            B: BufferRef,
             F: FnOnce(
                 *const c_void,
                 c_int,
@@ -28,7 +28,7 @@ impl<'c> Process<'c> {
                 *mut MPI_Request,
             ) -> c_int,
         {
-            let (buf, count) = buffer.into_raw();
+            let (buf, count) = buffer.as_raw();
             let mut mpi_request = 0;
             Error::from_mpi_res(mpi_isend(
                 buf,
@@ -43,11 +43,7 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn isend<'b, B: Buffer + ?Sized>(
-        &self,
-        buffer: &'b B,
-        tag: Tag,
-    ) -> RmpiResult<Request<'b>> {
+    pub fn isend<'b, B: BufferRef + 'b>(&self, buffer: B, tag: Tag) -> RmpiResult<Request<'b>> {
         unsafe {
             self.isend_with(
                 |buf, count, datatype, rank, tag, comm, request| {
@@ -61,14 +57,14 @@ impl<'c> Process<'c> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn ibsend_with<'b, F, B>(
+        pub unsafe fn ibsend_with<'b, F, B: 'b>(
             &self,
             mpi_ibsend: F,
-            buffer: &'b B,
+            buffer: B,
             tag: Tag,
         ) -> RmpiResult<Request<'b>>
         where
-            B: Buffer + ?Sized,
+            B: BufferRef,
             F: FnOnce(
                 *const c_void,
                 c_int,
@@ -79,7 +75,7 @@ impl<'c> Process<'c> {
                 *mut MPI_Request,
             ) -> c_int,
         {
-            let (buf, count) = buffer.into_raw();
+            let (buf, count) = buffer.as_raw();
             let mut mpi_request = 0;
             Error::from_mpi_res(mpi_ibsend(
                 buf,
@@ -94,11 +90,7 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn ibsend<'b, B: Buffer + ?Sized>(
-        &self,
-        buffer: &'b B,
-        tag: Tag,
-    ) -> RmpiResult<Request<'b>> {
+    pub fn ibsend<'b, B: BufferRef + 'b>(&self, buffer: B, tag: Tag) -> RmpiResult<Request<'b>> {
         unsafe {
             self.ibsend_with(
                 |buf, count, datatype, rank, tag, comm, request| {
@@ -112,14 +104,14 @@ impl<'c> Process<'c> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn issend_with<'b, F, B>(
+        pub unsafe fn issend_with<'b, F, B: 'b>(
             &self,
             mpi_issend: F,
-            buffer: &'b B,
+            buffer: B,
             tag: Tag,
         ) -> RmpiResult<Request<'b>>
         where
-            B: Buffer + ?Sized,
+            B: BufferRef,
             F: FnOnce(
                 *const c_void,
                 c_int,
@@ -130,7 +122,7 @@ impl<'c> Process<'c> {
                 *mut MPI_Request,
             ) -> c_int,
         {
-            let (buf, count) = buffer.into_raw();
+            let (buf, count) = buffer.as_raw();
             let mut mpi_request = 0;
             Error::from_mpi_res(mpi_issend(
                 buf,
@@ -145,11 +137,7 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn issend<'b, B: Buffer + ?Sized>(
-        &self,
-        buffer: &'b B,
-        tag: Tag,
-    ) -> RmpiResult<Request<'b>> {
+    pub fn issend<'b, B: BufferRef + 'b>(&self, buffer: B, tag: Tag) -> RmpiResult<Request<'b>> {
         unsafe {
             self.issend_with(
                 |buf, count, datatype, rank, tag, comm, request| {
@@ -163,14 +151,14 @@ impl<'c> Process<'c> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn irsend_with<'b, F, B>(
+        pub unsafe fn irsend_with<'b, F, B: 'b>(
             &self,
             mpi_irsend: F,
-            buffer: &'b B,
+            buffer: B,
             tag: Tag,
         ) -> RmpiResult<Request<'b>>
         where
-            B: Buffer + ?Sized,
+            B: BufferRef,
             F: FnOnce(
                 *const c_void,
                 c_int,
@@ -181,7 +169,7 @@ impl<'c> Process<'c> {
                 *mut MPI_Request,
             ) -> c_int,
         {
-            let (buf, count) = buffer.into_raw();
+            let (buf, count) = buffer.as_raw();
             let mut mpi_request = 0;
             Error::from_mpi_res(mpi_irsend(
                 buf,
@@ -196,11 +184,7 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn irsend<'b, B: Buffer + ?Sized>(
-        &self,
-        buffer: &'b B,
-        tag: Tag,
-    ) -> RmpiResult<Request<'b>> {
+    pub fn irsend<'b, B: BufferRef + 'b>(&self, buffer: B, tag: Tag) -> RmpiResult<Request<'b>> {
         unsafe {
             self.irsend_with(
                 |buf, count, datatype, rank, tag, comm, request| {

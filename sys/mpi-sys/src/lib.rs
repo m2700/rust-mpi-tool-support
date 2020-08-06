@@ -43,6 +43,10 @@ mod types_and_consts {
         RUST_UINT16_T as MPI_UINT16_T, RUST_UINT32_T as MPI_UINT32_T,
         RUST_UINT64_T as MPI_UINT64_T, RUST_UINT8_T as MPI_UINT8_T,
     };
+    pub const MPI_STATUS_IGNORE: *mut MPI_Status =
+        crate::c_mpi::RUST_MPI_STATUS_IGNORE as *mut MPI_Status;
+    pub const MPI_STATUSES_IGNORE: *mut MPI_Status =
+        crate::c_mpi::RUST_MPI_STATUSES_IGNORE as *mut MPI_Status;
 }
 pub use types_and_consts::*;
 

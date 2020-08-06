@@ -2,7 +2,7 @@ use std::os::raw::*;
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Buffer, MpiOp, RmpiResult};
+    use crate::{BufferRef,  MpiOp, RmpiResult};
 );
 
 use super::Communicator;
@@ -13,24 +13,19 @@ impl Communicator {
         pub unsafe fn scan_with<F, B>(
             &self,
             mpi_scan: F,
-            send_buffer: &B,
-            recv_buffer: &mut B::Single,
+            send_buffer: B,
+            recv_buffer: B::Mut,
             op: MpiOp,
         ) -> RmpiResult
         where
-            B: Buffer + ?Sized,
+            B: BufferRef,
             F: FnOnce(*const c_void, *mut c_void, c_int, MPI_Datatype, MPI_Op, MPI_Comm) -> c_int,
         {
             self.allreduce_with(mpi_scan, send_buffer, recv_buffer, op)
         }
     );
     #[inline]
-    pub fn scan<B: Buffer + ?Sized>(
-        &self,
-        send_buffer: &B,
-        recv_buffer: &mut B::Single,
-        op: MpiOp,
-    ) -> RmpiResult {
+    pub fn scan<B: BufferRef>(&self, send_buffer: B, recv_buffer: B::Mut, op: MpiOp) -> RmpiResult {
         unsafe {
             self.scan_with(
                 |sendbuf, recvbuf, count, dtype, op, comm| {

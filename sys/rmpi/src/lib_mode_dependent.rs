@@ -16,6 +16,7 @@ macro_rules! tool_mode_item {
 mod buffer;
 mod communicator;
 mod context;
+pub mod datatype;
 mod error;
 mod group;
 mod mpi_op;

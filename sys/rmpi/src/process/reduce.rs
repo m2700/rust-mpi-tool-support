@@ -1,8 +1,8 @@
-use std::{os::raw::*, ptr};
+use std::os::raw::*;
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Buffer, Error, MpiOp, RmpiResult};
+    use crate::{BufferRef, BufferMut, Error, MpiOp, RmpiResult};
 );
 
 use super::Process;
@@ -13,12 +13,12 @@ impl<'c> Process<'c> {
         pub unsafe fn reduce_with<F, B>(
             &self,
             mpi_reduce: F,
-            send_buffer: &B,
-            recv_buffer: Option<&mut B::Single>,
+            send_buffer: B,
+            mut recv_buffer: B::Mut,
             op: MpiOp,
         ) -> RmpiResult
         where
-            B: Buffer + ?Sized,
+            B: BufferRef,
             F: FnOnce(
                 *const c_void,
                 *mut c_void,
@@ -29,10 +29,9 @@ impl<'c> Process<'c> {
                 MPI_Comm,
             ) -> c_int,
         {
-            let (sendbuf, sendcount) = send_buffer.into_raw();
-            let recvbuf = recv_buffer
-                .map(|rb| rb.into_raw_mut().0)
-                .unwrap_or(ptr::null_mut());
+            let (sendbuf, sendcount) = send_buffer.as_raw();
+            let (recvbuf, recvcount) = recv_buffer.as_raw_mut();
+            debug_assert!(self.rank != self.communicator.current_rank()? || recvcount == sendcount);
 
             Error::from_mpi_res(mpi_reduce(
                 sendbuf,
@@ -46,10 +45,10 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn reduce<B: Buffer + ?Sized>(
+    pub fn reduce<B: BufferRef>(
         &self,
-        send_buffer: &B,
-        recv_buffer: Option<&mut B::Single>,
+        send_buffer: B,
+        recv_buffer: B::Mut,
         op: MpiOp,
     ) -> RmpiResult {
         unsafe {

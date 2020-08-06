@@ -2,7 +2,7 @@ use std::{mem::MaybeUninit, os::raw::*};
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Buffer, Error, RmpiResult, Status, Tag};
+    use crate::{BufferMut, Error, RmpiResult, Status, Tag};
 );
 
 use super::Process;
@@ -13,11 +13,12 @@ impl<'c> Process<'c> {
         pub unsafe fn recv_with<F, B>(
             &self,
             mpi_recv: F,
-            buffer: &mut B,
+            mut buffer: B,
             tag: Tag,
-        ) -> RmpiResult<Status>
+            status_ignore: bool,
+        ) -> RmpiResult<Option<Status>>
         where
-            B: Buffer + ?Sized,
+            B: BufferMut,
             F: FnOnce(
                 *mut c_void,
                 c_int,
@@ -28,8 +29,12 @@ impl<'c> Process<'c> {
                 *mut MPI_Status,
             ) -> c_int,
         {
-            let mut status = MaybeUninit::uninit();
-            let (buf, count) = buffer.into_raw_mut();
+            let mut status = if status_ignore {
+                None
+            } else {
+                Some(MaybeUninit::uninit())
+            };
+            let (buf, count) = buffer.as_raw_mut();
             let res = mpi_recv(
                 buf,
                 count,
@@ -37,13 +42,21 @@ impl<'c> Process<'c> {
                 self.rank,
                 *tag,
                 self.communicator.as_raw(),
-                status.as_mut_ptr(),
+                status
+                    .as_mut()
+                    .map(|s| s.as_mut_ptr())
+                    .unwrap_or(MPI_STATUS_IGNORE),
             );
-            Error::from_mpi_res(res).map(|()| Status::from_raw(status.assume_init()))
+            Error::from_mpi_res(res).map(|()| status.map(|s| Status::from_raw(s.assume_init())))
         }
     );
     #[inline]
-    pub fn recv<B: Buffer + ?Sized>(&self, buffer: &mut B, tag: Tag) -> RmpiResult<Status> {
+    pub fn recv<B: BufferMut>(
+        &self,
+        buffer: B,
+        tag: Tag,
+        status_ignore: bool,
+    ) -> RmpiResult<Option<Status>> {
         unsafe {
             self.recv_with(
                 |buf, count, datatype, rank, tag, comm, status| {
@@ -51,6 +64,7 @@ impl<'c> Process<'c> {
                 },
                 buffer,
                 tag,
+                status_ignore,
             )
         }
     }

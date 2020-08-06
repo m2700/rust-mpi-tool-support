@@ -2,7 +2,7 @@ use std::os::raw::*;
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{BufferMut, BufferRef, Error, RmpiResult};
+    use crate::{BufferRef, BufferMut, Error, RmpiResult};
 );
 
 use super::Process;
@@ -10,9 +10,9 @@ use super::Process;
 impl<'c> Process<'c> {
     tool_mode_item!(
         #[inline]
-        pub unsafe fn gather_with<F, SB, RB>(
+        pub unsafe fn scatter_with<F, SB, RB>(
             &self,
-            mpi_gather: F,
+            mpi_scatter: F,
             send_buffer: SB,
             mut recv_buffer: RB,
         ) -> RmpiResult
@@ -32,7 +32,7 @@ impl<'c> Process<'c> {
         {
             let (sendbuf, sendcount) = send_buffer.as_raw();
             let (recvbuf, recvcount) = recv_buffer.as_raw_mut();
-            Error::from_mpi_res(mpi_gather(
+            Error::from_mpi_res(mpi_scatter(
                 sendbuf,
                 sendcount,
                 send_buffer.item_datatype(),
@@ -45,15 +45,15 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn gather<SB: BufferRef, RB: BufferMut>(
+    pub fn scatter<SB: BufferRef, RB: BufferMut>(
         &self,
         send_buffer: SB,
         recv_buffer: RB,
     ) -> RmpiResult {
         unsafe {
-            self.gather_with(
+            self.scatter_with(
                 |sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm| {
-                    MPI_Gather(
+                    MPI_Scatter(
                         sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm,
                     )
                 },
@@ -65,99 +65,95 @@ impl<'c> Process<'c> {
 
     tool_mode_item!(
         #[inline]
-        pub unsafe fn gatherv_with<F, SB, RB>(
+        pub unsafe fn scatterv_with<F, SB, RB>(
             &self,
-            mpi_gatherv: F,
-            send_buffer: SB,
-            recv_buffers: &mut [RB],
+            mpi_scatterv: F,
+            send_buffers: &[SB],
+            mut recv_buffer: RB,
         ) -> RmpiResult
         where
             SB: BufferRef,
             RB: BufferMut,
             F: FnOnce(
                 *const c_void,
-                c_int,
+                *const c_int,
+                *const c_int,
                 MPI_Datatype,
                 *mut c_void,
-                *const c_int,
-                *const c_int,
+                c_int,
                 MPI_Datatype,
                 c_int,
                 MPI_Comm,
             ) -> c_int,
         {
             if self.communicator.current_rank()? == self.rank {
-                debug_assert_eq!(recv_buffers.len() as c_int, self.communicator.size()?);
+                debug_assert_eq!(send_buffers.len() as c_int, self.communicator.size()?);
             }
 
-            let (sendbuf, sendcount) = send_buffer.as_raw();
+            let (recvbuf, recvcount) = recv_buffer.as_raw_mut();
 
-            let recv_datatype_size = recv_buffers[0].datatype_size()? as usize;
-            let recvbuf_ptr = recv_buffers
-                .iter_mut()
-                .map(|recv_buffer| recv_buffer.as_mut_ptr())
+            let send_datatype_size = send_buffers[0].datatype_size()? as usize;
+            let sendbuf_ptr = send_buffers
+                .iter()
+                .map(|send_buffer| send_buffer.as_ptr())
                 .min()
                 .unwrap();
-            let recv_datatype = recv_buffers
+            let send_datatype = send_buffers
                 .get(0)
                 .map(|buf| buf.item_datatype())
                 .unwrap_or_default();
-            debug_assert!(recv_buffers
+            debug_assert!(send_buffers
                 .iter()
-                .all(|buf| buf.item_datatype() == recv_datatype));
+                .all(|buf| buf.item_datatype() == send_datatype));
 
-            let [mut recv_displs, mut recv_counts] = [vec![], vec![]];
-            for (recvbuf, recvcount) in recv_buffers
-                .iter_mut()
-                .map(|recv_buffer| (recv_buffer.as_mut_ptr(), recv_buffer.len()))
+            let [mut send_displs, mut send_counts] = [vec![], vec![]];
+            for (sendbuf, sendcount) in send_buffers
+                .iter()
+                .map(|send_buffer| (send_buffer.as_ptr(), send_buffer.len()))
             {
-                recv_displs.push(
-                    (((recvbuf as usize) - (recvbuf_ptr as usize)) / recv_datatype_size) as c_int,
+                send_displs.push(
+                    (((sendbuf as usize) - (sendbuf_ptr as usize)) / send_datatype_size) as c_int,
                 );
-                recv_counts.push(recvcount as c_int);
+                send_counts.push(sendcount as c_int);
             }
 
-            let recv_datatype = recv_buffers
-                .get(0)
-                .map(|buf| buf.item_datatype())
-                .unwrap_or_default();
-            Error::from_mpi_res(mpi_gatherv(
-                sendbuf,
-                sendcount,
-                send_buffer.item_datatype(),
-                recvbuf_ptr as *mut c_void,
-                recv_counts.as_ptr(),
-                recv_displs.as_ptr(),
-                recv_datatype,
+            Error::from_mpi_res(mpi_scatterv(
+                sendbuf_ptr as *mut c_void,
+                send_counts.as_ptr(),
+                send_displs.as_ptr(),
+                send_datatype,
+                recvbuf,
+                recvcount,
+                recv_buffer.item_datatype(),
                 self.rank,
                 self.communicator.as_raw(),
             ))
         }
     );
     #[inline]
-    pub fn gatherv<SB: BufferRef, RB: BufferMut>(
+    pub fn scatterv<SB: BufferRef, RB: BufferMut>(
         &self,
-        send_buffer: SB,
-        recv_buffers: &mut [RB],
+        send_buffers: &[SB],
+        recv_buffer: RB,
     ) -> RmpiResult {
         unsafe {
-            self.gatherv_with(
+            self.scatterv_with(
                 |sendbuf,
-                 sendcount,
+                 sendcounts,
+                 displs,
                  sendtype,
                  recvbuf,
-                 recvcounts,
-                 displs,
+                 recvcount,
                  recvtype,
                  root,
                  comm| {
-                    MPI_Gatherv(
-                        sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root,
+                    MPI_Scatterv(
+                        sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root,
                         comm,
                     )
                 },
-                send_buffer,
-                recv_buffers,
+                send_buffers,
+                recv_buffer,
             )
         }
     }

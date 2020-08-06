@@ -2,7 +2,7 @@ use std::os::raw::*;
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{request::Request, Buffer, Error, RmpiResult, Tag};
+    use crate::{request::Request, BufferMut, Error, RmpiResult, Tag};
 );
 
 use super::Process;
@@ -10,14 +10,14 @@ use super::Process;
 impl<'c> Process<'c> {
     tool_mode_item!(
         #[inline]
-        pub unsafe fn irecv_with<'b, F, B>(
+        pub unsafe fn irecv_with<'b, F, B: 'b>(
             &self,
             mpi_irecv: F,
-            buffer: &'b mut B,
+            mut buffer: B,
             tag: Tag,
         ) -> RmpiResult<Request<'b>>
         where
-            B: Buffer + ?Sized,
+            B: BufferMut,
             F: FnOnce(
                 *mut c_void,
                 c_int,
@@ -29,7 +29,7 @@ impl<'c> Process<'c> {
             ) -> c_int,
         {
             let mut request = 0;
-            let (buf, count) = buffer.into_raw_mut();
+            let (buf, count) = buffer.as_raw_mut();
             let res = mpi_irecv(
                 buf,
                 count,
@@ -43,11 +43,7 @@ impl<'c> Process<'c> {
         }
     );
     #[inline]
-    pub fn irecv<'b, B: Buffer + ?Sized>(
-        &self,
-        buffer: &'b mut B,
-        tag: Tag,
-    ) -> RmpiResult<Request<'b>> {
+    pub fn irecv<'b, B: BufferMut + 'b>(&self, buffer: B, tag: Tag) -> RmpiResult<Request<'b>> {
         unsafe {
             self.irecv_with(
                 |buf, count, datatype, rank, tag, comm, status| {

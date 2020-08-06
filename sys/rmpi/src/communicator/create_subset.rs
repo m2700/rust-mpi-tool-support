@@ -2,7 +2,7 @@ use std::{mem::MaybeUninit, os::raw::*};
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Buffer, Error, Group, RmpiResult};
+    use crate::{Error, Group, RmpiResult};
 );
 
 use super::Communicator;
@@ -28,7 +28,7 @@ impl Communicator {
         }
     );
     #[inline]
-    pub fn create_subset<B: Buffer + ?Sized>(&self, group: &Group) -> RmpiResult<Self> {
+    pub fn create_subset(&self, group: &Group) -> RmpiResult<Self> {
         unsafe {
             self.create_subset_with(
                 |comm, group, newcomm| MPI_Comm_create(comm, group, newcomm),

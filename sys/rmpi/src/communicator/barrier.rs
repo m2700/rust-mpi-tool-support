@@ -2,7 +2,7 @@ use std::os::raw::*;
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Buffer, Error,  RmpiResult};
+    use crate::{ Error,  RmpiResult};
 );
 
 use super::Communicator;
@@ -18,7 +18,7 @@ impl Communicator {
         }
     );
     #[inline]
-    pub fn barrier<B: Buffer + ?Sized>(&self) -> RmpiResult {
+    pub fn barrier(&self) -> RmpiResult {
         unsafe { self.barrier_with(|comm| MPI_Barrier(comm)) }
     }
 }

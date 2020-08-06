@@ -1,10 +1,14 @@
-use std::os::raw::{c_double, c_int};
+use std::{
+    mem::MaybeUninit,
+    os::raw::{c_double, c_int},
+};
 
 use rmpi::pmpi_mode as rmpi;
 
 use self::rmpi::{
+    datatype::RawDatatype,
     request::{Request, RequestSlice},
-    Buffer, CStrMutPtr, Communicator, Group, MpiDatatype, MpiOp, Process, RmpiContext, RmpiResult,
+    BufferMut, BufferRef, CStrMutPtr, Communicator, Group, MpiOp, Process, RmpiContext, RmpiResult,
     Status, Tag,
 };
 
@@ -42,76 +46,70 @@ pub trait MpiInterceptionLayer {
         fn comm_free(comm: Communicator) -> RmpiResult;
 
         #[inline]
-        fn send<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult
+        fn send<Buf>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult
         where
-            Buf: Buffer;
+            Buf: BufferRef;
         #[inline]
-        fn bsend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult
+        fn bsend<Buf>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult
         where
-            Buf: Buffer;
+            Buf: BufferRef;
         #[inline]
-        fn ssend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult
+        fn ssend<Buf>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult
         where
-            Buf: Buffer;
+            Buf: BufferRef;
         #[inline]
-        fn rsend<Buf: ?Sized>(buf: &Buf, dest: Process, tag: Tag) -> RmpiResult
+        fn rsend<Buf>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult
         where
-            Buf: Buffer;
+            Buf: BufferRef;
 
         #[inline]
-        fn isend<'b, Buf: ?Sized>(buf: &'b Buf, dest: Process, tag: Tag) -> RmpiResult<Request<'b>>
+        fn isend<'b, Buf: 'b>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult<Request<'b>>
         where
-            Buf: Buffer;
+            Buf: BufferRef;
         #[inline]
-        fn ibsend<'b, Buf: ?Sized>(
-            buf: &'b Buf,
-            dest: Process,
-            tag: Tag,
-        ) -> RmpiResult<Request<'b>>
+        fn ibsend<'b, Buf: 'b>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult<Request<'b>>
         where
-            Buf: Buffer;
+            Buf: BufferRef;
         #[inline]
-        fn issend<'b, Buf: ?Sized>(
-            buf: &'b Buf,
-            dest: Process,
-            tag: Tag,
-        ) -> RmpiResult<Request<'b>>
+        fn issend<'b, Buf: 'b>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult<Request<'b>>
         where
-            Buf: Buffer;
+            Buf: BufferRef;
 
         #[inline]
-        fn irsend<'b, Buf: ?Sized>(
-            buf: &'b Buf,
-            dest: Process,
-            tag: Tag,
-        ) -> RmpiResult<Request<'b>>
+        fn irsend<'b, Buf: 'b>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult<Request<'b>>
         where
-            Buf: Buffer;
+            Buf: BufferRef;
         #[inline]
-        fn recv<Buf: ?Sized>(buf: &mut Buf, src: Process, tag: Tag) -> RmpiResult<Status>
+        fn recv<Buf>(
+            buf: Buf,
+            src: Process,
+            tag: Tag,
+            status_ignore: bool,
+        ) -> RmpiResult<Option<Status>>
         where
-            Buf: Buffer;
+            Buf: BufferMut;
 
         #[inline]
-        fn sendrecv<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
+        fn sendrecv<SendBuf, RecvBuf>(
+            sendbuf: SendBuf,
             dest: Process,
             sendtag: Tag,
-            recvbuf: &mut RecvBuf,
+            recvbuf: RecvBuf,
             src: Process,
             recvtag: Tag,
-        ) -> RmpiResult<Status>
+            status_ignore: bool,
+        ) -> RmpiResult<Option<Status>>
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
 
         #[inline]
-        fn bcast<Buf: ?Sized>(buf: &mut Buf, root: Process) -> RmpiResult;
+        fn bcast<Buf>(buf: Buf, root: Process) -> RmpiResult
+        where
+            Buf: BufferMut;
 
         #[inline]
-        fn get_count<Datatype>(status: &Status) -> RmpiResult<c_int>
-        where
-            Datatype: MpiDatatype;
+        fn get_count(status: &Status, datatype: &RawDatatype) -> RmpiResult<c_int>;
 
         #[doc = "unsafe, because lifetime is unknown"]
         #[inline]
@@ -121,16 +119,31 @@ pub trait MpiInterceptionLayer {
         unsafe fn buffer_detach() -> RmpiResult<&'static mut [u8]>;
 
         #[inline]
-        fn wait(request: Request) -> RmpiResult<(Status, Option<Request>)>;
+        fn wait(
+            request: Request,
+            status_ignore: bool,
+        ) -> RmpiResult<(Option<Status>, Option<Request>)>;
         #[inline]
-        fn waitany(requests: &mut RequestSlice) -> RmpiResult<(usize, Status)>;
+        fn waitany(
+            requests: &mut RequestSlice,
+            status_ignore: bool,
+        ) -> RmpiResult<(usize, Option<Status>)>;
         #[inline]
-        fn waitall(requests: &mut RequestSlice, responses: &mut [Status]) -> RmpiResult;
+        fn waitall<'statuses>(
+            requests: &mut RequestSlice,
+            responses: &'statuses mut [MaybeUninit<Status>],
+        ) -> RmpiResult<&'statuses mut [Status]>;
 
         #[inline]
-        fn test(request: Request) -> RmpiResult<Result<(Status, Option<Request>), Request>>;
+        fn test(
+            request: Request,
+            status_ignore: bool,
+        ) -> RmpiResult<Result<(Option<Status>, Option<Request>), Request>>;
         #[inline]
-        fn testany(request: &mut RequestSlice) -> RmpiResult<Option<(usize, Status)>>;
+        fn testany(
+            request: &mut RequestSlice,
+            status_ignore: bool,
+        ) -> RmpiResult<Option<(usize, Option<Status>)>>;
 
         #[inline]
         fn request_free(request: Request) -> RmpiResult;
@@ -139,109 +152,107 @@ pub trait MpiInterceptionLayer {
 
         // should I really use Buffers of different datatypes??
         #[inline]
-        fn gather<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
-            recvbuf: &mut RecvBuf,
+        fn gather<SendBuf, RecvBuf>(
+            sendbuf: SendBuf,
+            recvbuf: RecvBuf,
             root: Process,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
         #[inline]
-        fn gatherv<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
-            recvbufs: &mut [&mut RecvBuf],
+        fn gatherv<SendBuf, RecvBuf>(
+            sendbuf: SendBuf,
+            recvbufs: &mut [RecvBuf],
             root: Process,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
         #[inline]
-        fn allgather<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
-            recvbuf: &mut RecvBuf,
+        fn allgather<SendBuf, RecvBuf>(
+            sendbuf: SendBuf,
+            recvbuf: RecvBuf,
             comm: &Communicator,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
         #[inline]
-        fn allgatherv<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
-            recvbufs: &mut [&mut RecvBuf],
+        fn allgatherv<SendBuf, RecvBuf>(
+            sendbuf: SendBuf,
+            recvbufs: &mut [RecvBuf],
             comm: &Communicator,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
 
         #[inline]
-        fn alltoall<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
-            recvbuf: &mut RecvBuf,
+        fn alltoall<SendBuf, RecvBuf>(
+            sendbuf: SendBuf,
+            recvbuf: RecvBuf,
             comm: &Communicator,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
         #[inline]
-        fn alltoallv<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbufs: &[&SendBuf],
-            recvbufs: &mut [&mut RecvBuf],
+        fn alltoallv<SendBuf, RecvBuf>(
+            sendbufs: &[SendBuf],
+            recvbufs: &mut [RecvBuf],
             comm: &Communicator,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
 
         #[inline]
-        fn reduce<Buf: ?Sized>(
-            sendbuf: &Buf,
-            recvbuf: Option<&mut Buf::Single>,
+        fn reduce<Buf>(
+            sendbuf: Buf,
+            recvbuf: Buf::Mut,
             op: MpiOp,
             root: Process,
         ) -> RmpiResult
         where
-            Buf: Buffer;
+            Buf: BufferRef;
         #[inline]
-        fn allreduce<Buf: ?Sized>(
-            sendbuf: &Buf,
-            recvbuf: &mut Buf::Single,
+        fn allreduce<Buf>(
+            sendbuf: Buf,
+            recvbuf: Buf::Mut,
             op: MpiOp,
             comm: &Communicator,
         ) -> RmpiResult
         where
-            Buf: Buffer;
+            Buf: BufferRef;
 
         #[inline]
-        fn scan<Buf: ?Sized>(
-            sendbuf: &Buf,
-            recvbuf: &mut Buf::Single,
+        fn scan<Buf>(
+            sendbuf: Buf,
+            recvbuf: Buf::Mut,
             op: MpiOp,
             comm: &Communicator,
         ) -> RmpiResult
         where
-            Buf: Buffer;
+            Buf: BufferRef;
 
-        //TODO
         #[inline]
-        fn scatter<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
-            recvbuf: &mut RecvBuf,
+        fn scatter<SendBuf, RecvBuf>(
+            sendbuf: SendBuf,
+            recvbuf: RecvBuf,
             root: Process,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
         #[inline]
-        fn scatterv<SendBuf: ?Sized, RecvBuf: ?Sized>(
-            sendbuf: &SendBuf,
-            displs: &[c_int],
-            recvbuf: &mut RecvBuf,
+        fn scatterv<SendBuf, RecvBuf>(
+            sendbufs: &[SendBuf],
+            recvbuf: RecvBuf,
             root: Process,
         ) -> RmpiResult
         where
-            SendBuf: Buffer,
-            RecvBuf: Buffer;
+            SendBuf: BufferRef,
+            RecvBuf: BufferMut;
     );
 }

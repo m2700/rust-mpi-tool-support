@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <mpi.h>
 
 const MPI_Datatype RUST_MPI_DATATYPE_NULL = MPI_DATATYPE_NULL;
@@ -97,3 +98,6 @@ const int RUST_MPI_REPLACE = MPI_REPLACE;
 const int RUST_MPI_ANY_TAG = MPI_ANY_TAG;
 
 const MPI_Request RUST_MPI_REQUEST_NULL = MPI_REQUEST_NULL;
+
+const size_t RUST_MPI_STATUS_IGNORE = (size_t)MPI_STATUS_IGNORE;
+const size_t RUST_MPI_STATUSES_IGNORE = (size_t)MPI_STATUSES_IGNORE;

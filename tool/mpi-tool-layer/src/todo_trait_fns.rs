@@ -476,68 +476,6 @@ where
     unsafe { next_f.unwrap()(incount, datatype, comm, size) }
 }
 #[inline]
-fn scatter<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    sendcount: c_int,
-    sendtype: MPI_Datatype,
-    recvbuf: *mut c_void,
-    recvcount: c_int,
-    recvtype: MPI_Datatype,
-    root: c_int,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(
-        *const c_void,
-        c_int,
-        MPI_Datatype,
-        *mut c_void,
-        c_int,
-        MPI_Datatype,
-        c_int,
-        MPI_Comm,
-    ) -> c_int,
-{
-    unsafe {
-        next_f.unwrap()(
-            sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm,
-        )
-    }
-}
-#[inline]
-fn scatterv<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    sendcounts: *const c_int,
-    displs: *const c_int,
-    sendtype: MPI_Datatype,
-    recvbuf: *mut c_void,
-    recvcount: c_int,
-    recvtype: MPI_Datatype,
-    root: c_int,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(
-        *const c_void,
-        *const c_int,
-        *const c_int,
-        MPI_Datatype,
-        *mut c_void,
-        c_int,
-        MPI_Datatype,
-        c_int,
-        MPI_Comm,
-    ) -> c_int,
-{
-    unsafe {
-        next_f.unwrap()(
-            sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, comm,
-        )
-    }
-}
-#[inline]
 fn alltoallw<F>(
     next_f: UnsafeBox<F>,
     sendbuf: *const c_void,

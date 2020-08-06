@@ -7,8 +7,10 @@ use std::{
 use rmpi::pmpi_mode as rmpi;
 
 use self::rmpi::{
+    datatype::{MpiPredefinedDatatype, RawDatatype},
     request::{Request, RequestSlice},
-    Buffer, CStrMutPtr, Communicator, Group, MpiDatatype, Process, SingleBuffer, Status,
+    Buffer, BufferMut, BufferRef, CStrMutPtr, Communicator, Group, Process, Status,
+    TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 use mpi_sys::pmpi::*;
 
@@ -398,15 +400,17 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::recv(
-                            |buf, dest, tag| {
-                                unsafe{dest.recv_with(next_f.unwrap(), buf, tag)}
+                            |buf, dest, tag, status_ignore| {
+                                unsafe{dest.recv_with(next_f.unwrap(), buf, tag, status_ignore)}
                             },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
-                            tag.into()
-                        ).map(|status_ret|{
-                            unsafe{status.write(status_ret.into_raw())};
-                            ()
+                            tag.into(),
+                            (status as *const MPI_Status) == MPI_STATUS_IGNORE
+                        ).map(|opt_status_ret|{
+                            if let Some(status_ret) = opt_status_ret {
+                                unsafe{status.write(status_ret.into_raw())};
+                            }
                         })
                     )
                 }
@@ -435,12 +439,14 @@ where
                         (recvbuf,recvcount,recvtype) => recv_buffer => {
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::sendrecv(
-                                    |sendbuf, dest, sendtag, recvbuf, src, recvtag| {
+                                    |sendbuf, dest, sendtag,
+                                     recvbuf, src, recvtag,
+                                     status_ignore| {
                                         unsafe {
                                             Process::sendrecv_with(
                                                 next_f.unwrap(),
                                                 sendbuf, dest, sendtag,
-                                                recvbuf, src, recvtag
+                                                recvbuf, src, recvtag, status_ignore
                                             )
                                         }
                                     },
@@ -450,9 +456,11 @@ where
                                     recv_buffer,
                                     unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
                                     recvtag.into(),
-                                ).map(|status_ret|{
-                                    unsafe{status.write(status_ret.into_raw())};
-                                    ()
+                                    status == MPI_STATUS_IGNORE
+                                ).map(|opt_status_ret|{
+                                    if let Some(status_ret) = opt_status_ret {
+                                        unsafe{status.write(status_ret.into_raw())};
+                                    }
                                 })
                             )
                         }
@@ -469,13 +477,11 @@ where
             count: *mut c_int,
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
-                define_datatype! {
-                    type DT = datatype;
-                    <Self as MpiInterceptionLayer>::get_count::<_, DT>(
-                        |status| unsafe{status.get_count_with::<_, DT>(next_f.unwrap())},
-                        unsafe { &Status::from_raw(*status)}
-                    )
-                }
+                <Self as MpiInterceptionLayer>::get_count(
+                    |status, datatype| unsafe { status.get_count_with(next_f.unwrap(), datatype) },
+                    unsafe { &Status::from_raw(*status) },
+                    &unsafe { RawDatatype::from_raw(datatype) },
+                )
                 .map(|cnt| {
                     unsafe { count.write(cnt) };
                     ()
@@ -488,8 +494,8 @@ where
             let buffer = buffer as *mut *mut u8;
             rmpi::Error::result_into_mpi_res(unsafe {
                 <Self as MpiInterceptionLayer>::buffer_attach(
-                    |buffer| {
-                        let (ptr, len) = buffer.into_raw_mut();
+                    |mut buffer| {
+                        let (ptr, len) = buffer.as_raw_mut();
                         rmpi::Error::from_mpi_res(next_f.unwrap()(ptr, len))
                     },
                     slice::from_raw_parts_mut(*buffer, size as usize),
@@ -523,16 +529,21 @@ where
         fn wait(next_f: UnsafeBox, request: *mut MPI_Request, status: *mut MPI_Status) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::wait(
-                    |request| unsafe { request.wait_with(next_f.unwrap()) },
+                    |request, status_ignore| unsafe {
+                        request.wait_with(next_f.unwrap(), status_ignore)
+                    },
                     unsafe { Request::from_raw(*request) },
+                    status == MPI_STATUS_IGNORE,
                 )
-                .map(|(out_status, opt_request_out)| unsafe {
+                .map(|(opt_out_status, opt_request_out)| unsafe {
                     request.write(
                         opt_request_out
                             .map(|out_request| out_request.into_raw())
                             .unwrap_or(MPI_REQUEST_NULL),
                     );
-                    status.write(out_status.into_raw());
+                    if let Some(out_status) = opt_out_status {
+                        status.write(out_status.into_raw());
+                    }
                 }),
             )
         }
@@ -546,17 +557,22 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::waitany(
-                    |req_slc| unsafe { req_slc.waitany_with(next_f.unwrap()) },
+                    |req_slc, status_ignore| unsafe {
+                        req_slc.waitany_with(next_f.unwrap(), status_ignore)
+                    },
                     unsafe {
                         RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
                             array_of_requests,
                             count as usize,
                         ))
                     },
+                    status == MPI_STATUS_IGNORE,
                 )
-                .map(|(out_indx, out_status)| unsafe {
+                .map(|(out_indx, opt_out_status)| unsafe {
                     indx.write(out_indx as c_int);
-                    status.write(out_status.into_raw());
+                    if let Some(out_status) = opt_out_status {
+                        status.write(out_status.into_raw());
+                    }
                 }),
             )
         }
@@ -567,16 +583,35 @@ where
             array_of_requests: *mut MPI_Request,
             array_of_statuses: *mut MPI_Status,
         ) -> c_int {
-            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::waitall(
-                |req_slc, status_slc| unsafe { req_slc.waitall_with(next_f.unwrap(), status_slc) },
-                unsafe {
-                    RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
-                        array_of_requests,
-                        count as usize,
-                    ))
-                },
-                Status::from_raw_slice_mut(array_of_statuses, count as usize),
-            ))
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::waitall(
+                    |req_slc, status_slc| unsafe {
+                        req_slc.waitall_with(next_f.unwrap(), status_slc)
+                    },
+                    unsafe {
+                        RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
+                            array_of_requests,
+                            count as usize,
+                        ))
+                    },
+                    if array_of_statuses as *mut MPI_Status == MPI_STATUSES_IGNORE {
+                        &mut []
+                    } else {
+                        unsafe {
+                            Status::from_raw_slice_mut_maybe_uninit(
+                                array_of_statuses,
+                                count as usize,
+                            )
+                        }
+                    },
+                )
+                .map(|out_statuses| {
+                    debug_assert_eq!(
+                        out_statuses.as_mut_ptr() as *mut MPI_Status,
+                        array_of_statuses
+                    );
+                }),
+            )
         }
 
         #[inline]
@@ -588,18 +623,23 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::test(
-                    |request| unsafe { request.test_with(next_f.unwrap()) },
+                    |request, status_ignore| unsafe {
+                        request.test_with(next_f.unwrap(), status_ignore)
+                    },
                     unsafe { Request::from_raw(*request) },
+                    status == MPI_STATUS_IGNORE,
                 )
-                .map(|opt_out_status| match opt_out_status {
-                    Ok((out_status, opt_request_out)) => unsafe {
+                .map(|test_result| match test_result {
+                    Ok((opt_out_status, opt_request_out)) => unsafe {
                         request.write(
                             opt_request_out
                                 .map(|out_request| out_request.into_raw())
                                 .unwrap_or(MPI_REQUEST_NULL),
                         );
                         flag.write(1);
-                        status.write(out_status.into_raw());
+                        if let Some(out_status) = opt_out_status {
+                            status.write(out_status.into_raw());
+                        }
                     },
                     Err(out_request) => unsafe {
                         request.write(out_request.into_raw());
@@ -619,19 +659,24 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::testany(
-                    |req_slc| unsafe { req_slc.testany_with(next_f.unwrap()) },
+                    |req_slc, status_ignore| unsafe {
+                        req_slc.testany_with(next_f.unwrap(), status_ignore)
+                    },
                     unsafe {
                         RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
                             array_of_requests,
                             count as usize,
                         ))
                     },
+                    status == MPI_STATUS_IGNORE,
                 )
                 .map(|opt_out| match opt_out {
-                    Some((out_indx, out_status)) => unsafe {
+                    Some((out_indx, opt_out_status)) => unsafe {
                         *flag = 1;
                         indx.write(out_indx as c_int);
-                        status.write(out_status.into_raw());
+                        if let Some(out_status) = opt_out_status {
+                            status.write(out_status.into_raw());
+                        }
                     },
                     None => unsafe { *flag = 0 },
                 }),
@@ -754,6 +799,39 @@ where
                                     unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
                                 )
                             )
+                        }
+                        dynamic {
+                            let recvtype = unsafe{RawDatatype::from_raw(recvtype)};
+                            let recvbuf = recvbuf as *mut c_void;
+                            let mut recv_buffers = vec![];
+                            rmpi::Error::result_into_mpi_res((||{
+                                if !(recvbuf.is_null() || recvcounts.is_null() || displs.is_null()) {
+                                    for recv_rank in
+                                            0..unsafe{Communicator::from_raw_ref(&comm)}
+                                                .size().unwrap(){
+                                        let recv_buffer_part = unsafe {
+                                            <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(
+                                                recvbuf.add(
+                                                    (*displs.add(recv_rank as usize) as usize)
+                                                    * (recvtype.size()? as usize)
+                                                ) as *mut c_void,
+                                                *recvcounts.add(recv_rank as usize),
+                                                recvtype.as_raw()
+                                            )
+                                        };
+                                        recv_buffers.push(recv_buffer_part);
+                                    };
+                                }
+                                <Self as MpiInterceptionLayer>::gatherv(
+                                    |send_buffer, recv_buffer, root| {
+                                        unsafe {
+                                            root.gatherv_with(next_f.unwrap(), send_buffer, recv_buffer)
+                                        }
+                                    },
+                                    send_buffer, &mut recv_buffers,
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                )
+                            })())
                         }
                     )
                 }
@@ -885,7 +963,7 @@ where
             recvtype: MPI_Datatype,
             comm: MPI_Comm,
         ) -> c_int {
-            define_datatype!{
+            define_datatype! {
                 type SendElem = sendtype;
                 {
                     let sendbuf = sendbuf as *mut SendElem;
@@ -952,7 +1030,26 @@ where
                 type Elem = datatype;
                 {
                     let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
-                    let recv_buffer = unsafe { <Elem as SingleBuffer>::from_raw_mut_single(recvbuf) };
+                    let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
+                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::reduce(
+                        |send_buffer, recv_buffer, op, root| unsafe {
+                            root.reduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
+                        },
+                        send_buffer,
+                        recv_buffer,
+                        op.into(),
+                        unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
+                    ))
+                }
+                dynamic {
+                    let send_buffer = unsafe {
+                        <TypeDynamicBufferRef as BufferRef>::from_raw2(sendbuf, count, datatype)
+                    };
+                    let recv_buffer = unsafe {
+                        <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(
+                            recvbuf, count, datatype
+                        )
+                    };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::reduce(
                         |send_buffer, recv_buffer, op, root| unsafe {
                             root.reduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
@@ -979,7 +1076,24 @@ where
                 type Elem = datatype;
                 {
                     let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
-                    let recv_buffer = unsafe { <Elem as Buffer>::from_raw_mut(recvbuf, 1) };
+                    let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
+                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
+                        |send_buffer, recv_buffer, op, communicator| unsafe {
+                            communicator.allreduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
+                        },
+                        send_buffer,
+                        recv_buffer,
+                        op.into(),
+                        unsafe { Communicator::from_raw_ref(&comm) },
+                    ))
+                }
+                dynamic {
+                    let send_buffer = unsafe {
+                        <TypeDynamicBufferRef as BufferRef>::from_raw2(sendbuf, count, datatype)
+                    };
+                    let recv_buffer = unsafe {
+                        <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(recvbuf, count, datatype)
+                    };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
                         |send_buffer, recv_buffer, op, communicator| unsafe {
                             communicator.allreduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
@@ -1007,7 +1121,28 @@ where
                 type Elem = datatype;
                 {
                     let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
-                    let recv_buffer = unsafe { <Elem as Buffer>::from_raw_mut(recvbuf, 1) };
+                    let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
+                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scan(
+                        |send_buffer, recv_buffer, op, communicator| unsafe {
+                            communicator.scan_with(next_f.unwrap(), send_buffer, recv_buffer, op)
+                        },
+                        send_buffer,
+                        recv_buffer,
+                        op.into(),
+                        unsafe { Communicator::from_raw_ref(&comm) },
+                    ))
+                }
+                dynamic {
+                    let send_buffer = unsafe {
+                        <TypeDynamicBufferRef as BufferRef>::from_raw2(
+                            sendbuf, count, datatype
+                        )
+                    };
+                    let recv_buffer = unsafe {
+                        <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(
+                            recvbuf, count, datatype
+                        )
+                    };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scan(
                         |send_buffer, recv_buffer, op, communicator| unsafe {
                             communicator.scan_with(next_f.unwrap(), send_buffer, recv_buffer, op)
@@ -1019,6 +1154,131 @@ where
                     ))
                 }
             }
+        }
+
+        #[inline]
+        fn scatter(
+            next_f: UnsafeBox,
+            sendbuf: *const c_void,
+            sendcount: c_int,
+            sendtype: MPI_Datatype,
+            recvbuf: *mut c_void,
+            recvcount: c_int,
+            recvtype: MPI_Datatype,
+            root: c_int,
+            comm: MPI_Comm,
+        ) -> c_int {
+            unsafe_with_buf!(
+                (sendbuf, sendcount, sendtype) => send_buffer => {
+                    unsafe_with_buf_mut!(
+                        (recvbuf, recvcount, recvtype) => recv_buffer => {
+                            rmpi::Error::result_into_mpi_res(
+                                <Self as MpiInterceptionLayer>::scatter(
+                                    |send_buffer, recv_buffer, root| {
+                                        unsafe {
+                                            root.scatter_with(next_f.unwrap(), send_buffer, recv_buffer)
+                                        }
+                                    },
+                                    send_buffer, recv_buffer,
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                )
+                            )
+                        }
+                    )
+                }
+            )
+        }
+        #[inline]
+        fn scatterv(
+            next_f: UnsafeBox,
+            sendbuf: *const c_void,
+            sendcounts: *const c_int,
+            displs: *const c_int,
+            sendtype: MPI_Datatype,
+            recvbuf: *mut c_void,
+            recvcount: c_int,
+            recvtype: MPI_Datatype,
+            root: c_int,
+            comm: MPI_Comm,
+        ) -> c_int {
+            unsafe_with_buf_mut!(
+                (recvbuf, recvcount, recvtype) => recv_buffer => {
+                    define_datatype!(
+                        type SendElem = sendtype;
+                        {
+                            let sendbuf = sendbuf as *const SendElem;
+                            let mut send_buffers = vec![];
+                            if !(sendbuf.is_null() || sendcounts.is_null() || displs.is_null()) {
+                                for send_rank in
+                                        0..unsafe{Communicator::from_raw_ref(&comm)}
+                                            .size().unwrap(){
+                                    let send_buffer_part = unsafe {
+                                        <[SendElem] as Buffer>::from_raw(
+                                            sendbuf.add(
+                                                *displs.add(send_rank as usize) as usize
+                                            ) as *const c_void,
+                                            *sendcounts.add(send_rank as usize)
+                                        )
+                                    };
+                                    send_buffers.push(send_buffer_part);
+                                };
+                            }
+                            rmpi::Error::result_into_mpi_res(
+                                <Self as MpiInterceptionLayer>::scatterv(
+                                    |send_buffer, recv_buffer, root| {
+                                        unsafe {
+                                            root.scatterv_with(next_f.unwrap(), send_buffer, recv_buffer)
+                                        }
+                                    },
+                                    &send_buffers, recv_buffer,
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                )
+                            )
+                        }
+                        dynamic {
+                            let sendtype = unsafe{RawDatatype::from_raw(sendtype)};
+                            let sendbuf = sendbuf as *const c_void;
+                            let mut send_buffers = vec![];
+                            rmpi::Error::result_into_mpi_res(
+                                (||{
+                                    if !(sendbuf.is_null() || sendcounts.is_null() || displs.is_null()) {
+                                        for send_rank in
+                                                0..unsafe{Communicator::from_raw_ref(&comm)}
+                                                    .size().unwrap(){
+                                            let send_buffer_part = unsafe {
+                                                <TypeDynamicBufferRef as BufferRef>::from_raw2(
+                                                    sendbuf.add(
+                                                        (
+                                                            *displs.add(send_rank as usize)
+                                                             * sendtype.size()?
+                                                        ) as usize
+                                                    ) as *const c_void,
+                                                    *sendcounts.add(send_rank as usize),
+                                                    sendtype.as_raw()
+                                                )
+                                            };
+                                            send_buffers.push(send_buffer_part);
+                                        };
+                                    }
+                                    <Self as MpiInterceptionLayer>::scatterv(
+                                        |send_buffer, recv_buffer, root| {
+                                            unsafe {
+                                                root.scatterv_with(
+                                                    next_f.unwrap(),
+                                                    send_buffer,
+                                                    recv_buffer
+                                                )
+                                            }
+                                        },
+                                        &send_buffers, recv_buffer,
+                                        unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                    )
+                                })()
+                            )
+                        }
+                    )
+                }
+            )
         }
     );
 }

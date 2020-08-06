@@ -10,6 +10,7 @@ mod irecv;
 mod isend;
 mod recv;
 mod reduce;
+mod scatter;
 mod send;
 mod sendrecv;
 

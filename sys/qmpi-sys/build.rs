@@ -81,6 +81,7 @@ async fn main() {
 
     println!("cargo:rerun-if-changed={}", qmpi_root_path.display());
 
+    #[cfg(feature = "use_git_header")]
     println!("cargo:rerun-if-changed={}", qmpi_h_path.display());
     #[cfg(feature = "bundled")]
     println!("cargo:rerun-if-changed={}", qmpi_c_path.display());

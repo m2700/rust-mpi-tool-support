@@ -1,8 +1,12 @@
-use std::{mem::transmute, os::raw::c_int, slice};
+use std::{
+    mem::{transmute, MaybeUninit},
+    os::raw::c_int,
+    slice,
+};
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Error, MpiDatatype, RmpiResult};
+    use crate::{Error, datatype::RawDatatype, RmpiResult};
 );
 
 #[derive(Clone, Copy)]
@@ -19,13 +23,28 @@ impl Status {
     }
 
     #[inline]
-    pub fn from_raw_slice<'a>(raw: *const MPI_Status, len: usize) -> &'a [Self] {
-        unsafe { transmute(slice::from_raw_parts(raw, len)) }
+    pub unsafe fn from_raw_slice<'a>(raw: *const MPI_Status, len: usize) -> &'a [Self] {
+        transmute(slice::from_raw_parts(raw, len))
     }
     #[inline]
-    pub fn from_raw_slice_mut<'a>(raw: *mut MPI_Status, len: usize) -> &'a mut [Self] {
-        unsafe { transmute(slice::from_raw_parts_mut(raw, len)) }
+    pub unsafe fn from_raw_slice_mut<'a>(raw: *mut MPI_Status, len: usize) -> &'a mut [Self] {
+        transmute(slice::from_raw_parts_mut(raw, len))
     }
+    #[inline]
+    pub unsafe fn from_raw_slice_maybe_uninit<'a>(
+        raw: *const MPI_Status,
+        len: usize,
+    ) -> &'a [MaybeUninit<Self>] {
+        transmute(slice::from_raw_parts(raw, len))
+    }
+    #[inline]
+    pub unsafe fn from_raw_slice_mut_maybe_uninit<'a>(
+        raw: *mut MPI_Status,
+        len: usize,
+    ) -> &'a mut [MaybeUninit<Self>] {
+        transmute(slice::from_raw_parts_mut(raw, len))
+    }
+
     #[inline]
     pub fn into_raw_slice(this: &[Self]) -> &[MPI_Status] {
         unsafe { transmute(this) }
@@ -34,29 +53,34 @@ impl Status {
     pub fn into_raw_slice_mut(this: &mut [Self]) -> &mut [MPI_Status] {
         unsafe { transmute(this) }
     }
+    #[inline]
+    pub fn as_maybe_uninit_ptr(this: &[MaybeUninit<Self>]) -> *const MPI_Status {
+        this.as_ptr() as *const _
+    }
+    #[inline]
+    pub fn as_maybe_uninit_ptr_mut(this: &mut [MaybeUninit<Self>]) -> *mut MPI_Status {
+        this.as_mut_ptr() as *mut _
+    }
 
     tool_mode_item! {
         #[inline]
-        pub unsafe fn get_count_with<F, Datatype>(&self, get_count: F) -> RmpiResult<c_int>
+        pub unsafe fn get_count_with<F>(&self, get_count: F, datatype: &RawDatatype) -> RmpiResult<c_int>
             where
                 F: FnOnce(*const MPI_Status, MPI_Datatype, *mut c_int) -> c_int,
-                Datatype: MpiDatatype
         {
             let mut count = 0;
             Error::from_mpi_res(
-                get_count(&self.into_raw(), Datatype::datatype(), &mut count)
+                get_count(&self.into_raw(), datatype.as_raw(), &mut count)
             ).map(|()|count)
         }
     }
     #[inline]
-    pub fn get_count<Datatype>(&self) -> RmpiResult<c_int>
-    where
-        Datatype: MpiDatatype,
-    {
+    pub fn get_count(&self, datatype: &RawDatatype) -> RmpiResult<c_int> {
         unsafe {
-            self.get_count_with::<_, Datatype>(|status, datatype, count| {
-                MPI_Get_count(status, datatype, count)
-            })
+            self.get_count_with(
+                |status, datatype, count| MPI_Get_count(status, datatype, count),
+                datatype,
+            )
         }
     }
 }

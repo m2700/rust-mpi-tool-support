@@ -7,7 +7,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         fn $fn_id:ident
-        $(< $($gen_lft:lifetime ,)* $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
+        $(< $($gen_lft:lifetime),* $(,)? $( $gen_tp:ident $(: $lft_cns:lifetime )? ),* >)?
         ( $nextf:ident : UnsafeBox $(, $argp:ident : $argt:ty)* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
@@ -17,7 +17,7 @@ macro_rules! trait_layer_function {
         $( $($nxt:tt)+ )?
     ) => {
         $( #[ $mt ] )*
-        fn $fn_id < $($gen_lft ,)* F $(, $( $gen_tp $(: ?$mrk_cns)? ),*)? >
+        fn $fn_id < $($gen_lft ,)* F $(, $( $gen_tp $(: $lft_cns)? ),*)? >
         ( $nextf: UnsafeBox<F>, $($argp : $argt),* ) -> $ret
             where
                 F: FnOnce($($argt),*) -> $ret,
@@ -31,7 +31,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         fn $fn_id:ident
-        $(< $($gen_lft:lifetime ,)* $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
+        $(< $($gen_lft:lifetime),* $(,)? $( $gen_tp:ident $(: $lft_cns:lifetime)? ),* >)?
         ( $nextf:ident $(, $argp:ident : $argt:ty)* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
@@ -41,7 +41,7 @@ macro_rules! trait_layer_function {
         $( $($nxt:tt)+ )?
     ) => {
         $( #[ $mt ] )*
-        fn $fn_id < $($($gen_lft ,)*)? F $(, $( $gen_tp $(: ?$mrk_cns)? ),*)? >
+        fn $fn_id < $($($gen_lft ,)*)? F $(, $( $gen_tp $(: $lft_cns)? ),*)? >
         ( $nextf: F, $($argp : $argt),* ) -> $ret
             where
                 F: FnOnce($($argt),*) -> $ret,
@@ -55,7 +55,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         unsafe fn $fn_id:ident
-        $(< $($gen_lft:lifetime ,)* $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
+        $(< $($gen_lft:lifetime),* $(,)? $( $gen_tp:ident $(: $lft_cns:lifetime)? ),* >)?
         ( $nextf:ident $(, $argp:ident : $argt:ty)* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
@@ -65,7 +65,7 @@ macro_rules! trait_layer_function {
         $( $($nxt:tt)+ )?
     ) => {
         $( #[ $mt ] )*
-        unsafe fn $fn_id < $($($gen_lft ,)*)? F $(, $( $gen_tp $(: ?$mrk_cns)? ),*)? >
+        unsafe fn $fn_id < $($($gen_lft ,)*)? F $(, $( $gen_tp $(: $lft_cns)? ),*)? >
         ( $nextf: F, $($argp : $argt),* ) -> $ret
             where
                 F: FnOnce($($argt),*) -> $ret,
@@ -80,7 +80,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         fn $fn_id:ident
-        $(< $($gen_lft:lifetime ,)* $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
+        $(< $($gen_lft:lifetime),* $(,)? $( $gen_tp:ident $(: $lft_cns:lifetime)? ),* >)?
         ( UnsafeBox $(, $argp:ident : $argt:ty)* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
@@ -90,7 +90,7 @@ macro_rules! trait_layer_function {
     ) => {
         trait_layer_function!{
             $( #[ $mt ] )*
-            fn $fn_id $(< $($gen_lft ,)* $( $gen_tp $(: ?$mrk_cns)? ),* >)?
+            fn $fn_id $(< $($gen_lft ,)* $( $gen_tp $(: $lft_cns)? ),* >)?
             ( next_f: UnsafeBox, $($argp : $argt),* ) -> $ret
                 $(
                     where $($cns_tp : $tr_cns $( + $adt_tr_cns)* ),*
@@ -105,7 +105,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         fn $fn_id:ident
-        $(< $($gen_lft:lifetime ,)* $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
+        $(< $($gen_lft:lifetime),* $(,)? $( $gen_tp:ident $(: $lft_cns:lifetime)? ),* >)?
         ( $($argp:ident : $argt:ty),* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
@@ -115,7 +115,7 @@ macro_rules! trait_layer_function {
     ) => {
         trait_layer_function!{
             $( #[ $mt ] )*
-            fn $fn_id $(< $($gen_lft ,)* $( $gen_tp $(: ?$mrk_cns)? ),* >)?
+            fn $fn_id $(< $($gen_lft ,)* $( $gen_tp $(: $lft_cns)? ),* >)?
             ( next_f, $($argp : $argt),* ) -> $ret
                 $(
                     where $($cns_tp : $tr_cns $( + $adt_tr_cns)* ),*
@@ -130,7 +130,7 @@ macro_rules! trait_layer_function {
     (
         $( #[ $mt:meta ] )*
         unsafe fn $fn_id:ident
-        $(< $($gen_lft:lifetime ,)* $( $gen_tp:ident $(: ?$mrk_cns:ident)? ),* >)?
+        $(< $($gen_lft:lifetime),* $(,)? $( $gen_tp:ident $(: $lft_cns:lifetime)? ),* >)?
         ( $($argp:ident : $argt:ty),* $(,)? ) -> $ret:ty
             $(
                 where $($cns_tp:ty : $tr_cns:ident $( + $adt_tr_cns:ident)* ),*
@@ -140,7 +140,7 @@ macro_rules! trait_layer_function {
     ) => {
         trait_layer_function!{
             $( #[ $mt ] )*
-            unsafe fn $fn_id $(< $($gen_lft ,)* $( $gen_tp $(: ?$mrk_cns)? ),* >)?
+            unsafe fn $fn_id $(< $($gen_lft ,)* $( $gen_tp $(: $lft_cns)? ),* >)?
             ( next_f, $($argp : $argt),* ) -> $ret
                 $(
                     where $($cns_tp : $tr_cns $( + $adt_tr_cns)* ),*
