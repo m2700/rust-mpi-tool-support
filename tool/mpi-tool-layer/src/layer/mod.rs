@@ -33,6 +33,35 @@ macro_rules! unsafe_with_buf_mut {
     };
 }
 
+// macro_rules! define_buffertype {
+//     ( type $bt_tp:ident = &[$datatype:ident]; $ret:expr ) => (
+//         define_datatype!(
+//             type Elem = $datatype;
+//             {
+//                 type $bt_tp = &[Elem];
+//                 $ret
+//             }
+//             dynamic {
+//                 type $bt_tp = TypeDynamicBufferRef;
+//                 $ret
+//             }
+//         )
+//     );
+//     ( type $bt_tp:ident = &mut [$datatype:ident]; $ret:expr ) => (
+//         define_datatype!(
+//             type Elem = $datatype;
+//             {
+//                 type $bt_tp = &mut [Elem];
+//                 $ret
+//             }
+//             dynamic {
+//                 type $bt_tp = TypeDynamicBufferMut;
+//                 $ret
+//             }
+//         )
+//     );
+// }
+
 macro_rules! define_datatype {
     ( type $dt_tp:ident = $datatype:ident; $ret:expr ) => (
         define_datatype!(
