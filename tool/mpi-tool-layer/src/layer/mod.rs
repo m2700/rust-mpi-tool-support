@@ -8,7 +8,7 @@ macro_rules! unsafe_with_buf {
             }
             dynamic {
                 let $buffer = unsafe {
-                    <TypeDynamicBufferRef as BufferRef>::from_raw2($buf, $count, $datatype)
+                    TypeDynamicBufferRef::from_raw_dynamic($buf, $count, $datatype)
                 };
                 $ret
             }
@@ -25,7 +25,7 @@ macro_rules! unsafe_with_buf_mut {
             }
             dynamic {
                 let $buffer = unsafe {
-                    <TypeDynamicBufferMut as BufferMut>::from_raw_mut2($buf, $count, $datatype)
+                    TypeDynamicBufferMut::from_raw_dynamic($buf, $count, $datatype)
                 };
                 $ret
             }

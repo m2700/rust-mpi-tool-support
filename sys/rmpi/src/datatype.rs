@@ -122,7 +122,7 @@ impl RawDatatype {
     );
     #[inline]
     pub fn size(&self) -> RmpiResult<c_int> {
-        unsafe { self.size_with(|datatype, size| MPI_Type_dup(datatype, size)) }
+        unsafe { self.size_with(|datatype, size| MPI_Type_size(datatype, size)) }
     }
 }
 

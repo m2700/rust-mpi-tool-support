@@ -810,7 +810,7 @@ where
                                             0..unsafe{Communicator::from_raw_ref(&comm)}
                                                 .size().unwrap(){
                                         let recv_buffer_part = unsafe {
-                                            <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(
+                                            TypeDynamicBufferMut::from_raw_dynamic(
                                                 recvbuf.add(
                                                     (*displs.add(recv_rank as usize) as usize)
                                                     * (recvtype.size()? as usize)
@@ -1043,10 +1043,10 @@ where
                 }
                 dynamic {
                     let send_buffer = unsafe {
-                        <TypeDynamicBufferRef as BufferRef>::from_raw2(sendbuf, count, datatype)
+                        TypeDynamicBufferRef::from_raw_dynamic(sendbuf, count, datatype)
                     };
                     let recv_buffer = unsafe {
-                        <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(
+                        TypeDynamicBufferMut::from_raw_dynamic(
                             recvbuf, count, datatype
                         )
                     };
@@ -1089,10 +1089,10 @@ where
                 }
                 dynamic {
                     let send_buffer = unsafe {
-                        <TypeDynamicBufferRef as BufferRef>::from_raw2(sendbuf, count, datatype)
+                        TypeDynamicBufferRef::from_raw_dynamic(sendbuf, count, datatype)
                     };
                     let recv_buffer = unsafe {
-                        <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(recvbuf, count, datatype)
+                        TypeDynamicBufferMut::from_raw_dynamic(recvbuf, count, datatype)
                     };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
                         |send_buffer, recv_buffer, op, communicator| unsafe {
@@ -1134,12 +1134,12 @@ where
                 }
                 dynamic {
                     let send_buffer = unsafe {
-                        <TypeDynamicBufferRef as BufferRef>::from_raw2(
+                        TypeDynamicBufferRef::from_raw_dynamic(
                             sendbuf, count, datatype
                         )
                     };
                     let recv_buffer = unsafe {
-                        <TypeDynamicBufferMut as BufferMut>::from_raw_mut2(
+                        TypeDynamicBufferMut::from_raw_dynamic(
                             recvbuf, count, datatype
                         )
                     };
@@ -1246,7 +1246,7 @@ where
                                                 0..unsafe{Communicator::from_raw_ref(&comm)}
                                                     .size().unwrap(){
                                             let send_buffer_part = unsafe {
-                                                <TypeDynamicBufferRef as BufferRef>::from_raw2(
+                                                TypeDynamicBufferRef::from_raw_dynamic(
                                                     sendbuf.add(
                                                         (
                                                             *displs.add(send_rank as usize)
