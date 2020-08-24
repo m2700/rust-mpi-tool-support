@@ -21,12 +21,6 @@ macro_rules! install_qmpi_layer {
         let level: ::std::os::raw::c_int = $level;
         let v: *mut $crate::qmpi_sys::vector = $v;
 
-        let level = if $fn_idx == $crate::qmpi_sys::_MPI_funcs::_MPI_Pcontrol {
-            0
-        } else {
-            $crate::install_qmpi_layer!(@get_level level, $fn_idx, v)
-        };
-
         let func_ptr:
             Option<
                 extern "C"
@@ -36,11 +30,19 @@ macro_rules! install_qmpi_layer {
              = ::std::mem::transmute(func_ptr);
 
         let func_ptr = func_ptr.expect("function pointer for execution is null, function can't be executed");
-        let next_f = $crate::UnsafeBox::new(|$($arg_id),*| func_ptr( $( $arg_id ,)* level, v ));
-        let res = $crate::install_qmpi_layer!(@intercept($layer, $fn_intcpt)
-            $fn_id ( next_f $(, $arg_id)* )
-        );
-        res
+
+        if $fn_idx == $crate::qmpi_sys::_MPI_funcs::_MPI_Pcontrol {
+            let next_f = $crate::UnsafeBox::new(|$($arg_id),*| $crate::mpi_sys::MPI_SUCCESS as _);
+            $crate::install_qmpi_layer!(@intercept($layer, $fn_intcpt)
+                $fn_id ( next_f $(, $arg_id)* )
+            )
+        } else {
+            let level = $crate::install_qmpi_layer!(@get_level level, $fn_idx, v);
+            let next_f = $crate::UnsafeBox::new(|$($arg_id),*| func_ptr( $( $arg_id ,)* level, v ));
+            $crate::install_qmpi_layer!(@intercept($layer, $fn_intcpt)
+                $fn_id ( next_f $(, $arg_id)* )
+            )
+        }
     }};
 
     (@interception_function( $layer:ty )
