@@ -1,2 +1,2 @@
 mod install;
-mod interception_names;
+pub(crate) mod interception_names;

@@ -84,6 +84,14 @@ macro_rules! install_qmpi_layer {
     );
 
     ( $layer:ty ) => (
+        const _: $crate::qmpi_sys::mpi_func = Some(get_interceptions);
+
+        #[no_mangle]
+        extern "C" fn get_interceptions(i: ::std::os::raw::c_int) -> *mut ::std::os::raw::c_char {
+            // make ptr mutable (in assumption the content is not going to be changed regardless)
+            $crate::INTERCEPTION_NAMES[i as usize].as_ptr() as *mut ::std::os::raw::c_char
+        }
+
         $crate::install_qmpi_layer! {@interception_function($layer)
             fn E_Send[$crate::qmpi_sys::_MPI_funcs::_MPI_Send, send]( buf : * const ::std::os::raw::c_void , count : ::std::os::raw::c_int , datatype : $crate::mpi_sys::MPI_Datatype , dest : ::std::os::raw::c_int , tag : ::std::os::raw::c_int , comm : $crate::mpi_sys::MPI_Comm , ) -> ::std::os::raw::c_int;
             fn E_Recv[$crate::qmpi_sys::_MPI_funcs::_MPI_Recv, recv]( buf : * mut ::std::os::raw::c_void , count : ::std::os::raw::c_int , datatype : $crate::mpi_sys::MPI_Datatype , source : ::std::os::raw::c_int , tag : ::std::os::raw::c_int , comm : $crate::mpi_sys::MPI_Comm , status : * mut $crate::mpi_sys::MPI_Status , ) -> ::std::os::raw::c_int;

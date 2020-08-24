@@ -1,5 +1,3 @@
-use std::os::raw::{c_char, c_int};
-
 macro_rules! cstr {
     ($s:literal) => {
         ::std::concat!($s, '\0')
@@ -11,7 +9,7 @@ macro_rules! cstr_array {
     };
 }
 
-const INTERCEPTIONS: [&str; qmpi_sys::NUM_MPI_FUNCS as usize] = cstr_array![
+pub const INTERCEPTIONS: [&str; qmpi_sys::NUM_MPI_FUNCS as usize] = cstr_array![
     "E_Abort",
     "E_Accumulate",
     "E_Add_error_class",
@@ -373,11 +371,3 @@ const INTERCEPTIONS: [&str; qmpi_sys::NUM_MPI_FUNCS as usize] = cstr_array![
     "E_Wtick",
     "E_Wtime",
 ];
-
-const _GET_INTERCEPTIONS: qmpi_sys::mpi_func = Some(get_interceptions);
-
-#[no_mangle]
-extern "C" fn get_interceptions(i: c_int) -> *mut c_char {
-    // make ptr mutable (in assumption the content is not going to be changed regardless)
-    INTERCEPTIONS[i as usize].as_ptr() as *mut c_char
-}
