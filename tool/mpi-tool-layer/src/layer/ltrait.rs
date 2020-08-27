@@ -88,6 +88,10 @@ pub trait MpiInterceptionLayer {
         ) -> RmpiResult<Option<Status>>
         where
             Buf: BufferMut;
+        #[inline]
+        fn irecv<'b, Buf: 'b>(buf: Buf, dest: Process, tag: Tag) -> RmpiResult<Request<'b>>
+        where
+            Buf: BufferMut;
 
         #[inline]
         fn sendrecv<SendBuf, RecvBuf>(

@@ -418,6 +418,36 @@ where
         }
 
         #[inline]
+        fn irecv(
+            next_f: UnsafeBox,
+            buf: *mut c_void,
+            count: c_int,
+            datatype: MPI_Datatype,
+            source: c_int,
+            tag: c_int,
+            comm: MPI_Comm,
+            request: *mut MPI_Request,
+        ) -> c_int {
+            unsafe_with_buf_mut!(
+                (buf,count,datatype) => buffer => {
+                    rmpi::Error::result_into_mpi_res(
+                        <Self as MpiInterceptionLayer>::irecv(
+                            |buf, source, tag| {
+                                unsafe{source.irecv_with(next_f.unwrap(), buf, tag)}
+                            },
+                            buffer,
+                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
+                            tag.into()
+                        ).map(|rq|{
+                            unsafe{request.write(rq.into_raw())};
+                            ()
+                        })
+                    )
+                }
+            )
+        }
+
+        #[inline]
         fn sendrecv(
             next_f: UnsafeBox,
             sendbuf: *const c_void,
