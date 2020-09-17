@@ -48,7 +48,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             };
             let call_count = all_fn_counts[fnid as usize];
             if call_count != 0 {
-                let println!("MPI_{:?}: {}", fnid, coll_count);
+                println!("MPI_{:?}: {}", fnid, call_count);
             }
         }
         res
