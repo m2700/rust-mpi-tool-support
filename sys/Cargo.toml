@@ -1,2 +1,2 @@
 [workspace]
-members = ["*-sys", "rmpi", "cnum"]
+members = ["*-sys", "rmpi", "cnum", "mpi_func-id"]

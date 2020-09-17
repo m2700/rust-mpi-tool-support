@@ -3,13 +3,13 @@ use std::{
     marker::PhantomData,
     mem::{forget, transmute},
     os::raw::{c_char, c_int},
-    ptr::{self},
+    ptr::{self, NonNull},
     slice,
 };
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Error, RmpiResult};
+    use crate::{Error, RmpiResult, Communicator};
 );
 
 #[repr(transparent)]
@@ -105,6 +105,7 @@ pub fn init(args_mut: &mut &mut [CStrMutPtr]) -> RmpiResult<Option<RmpiContext>>
     unsafe { init_with(|argc, argv| MPI_Init(argc, argv), args_mut) }
 }
 
+#[repr(C)]
 pub struct RmpiContext {
     not_send_marker: PhantomData<*mut ()>,
 }
@@ -119,6 +120,14 @@ impl Drop for RmpiContext {
     }
 }
 impl RmpiContext {
+    #[inline]
+    pub unsafe fn create_unchecked_ref() -> &'static Self {
+        &*NonNull::dangling().as_ptr()
+    }
+    #[inline]
+    pub fn world(&self) -> Communicator {
+        unsafe { Communicator::from_raw(MPI_COMM_WORLD) }
+    }
     #[inline]
     pub fn finalize(self) -> RmpiResult {
         forget(self);

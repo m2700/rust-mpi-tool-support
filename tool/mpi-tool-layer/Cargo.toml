@@ -6,11 +6,19 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[test]]
+name = "layer_consistency"
+path = "tests/layer_consistency.rs"
+required-features = ["rmpi_support"]
 
 [dependencies]
 mpi-sys = { path = "../../sys/mpi-sys", features = ["tool_mode"] }
 rmpi = { path = "../../sys/rmpi", features = ["tool_mode"], optional = true }
 cnum = { path = "../../sys/cnum" }
+
+[dev-dependencies]
+mpi-sys = { path = "../../sys/mpi-sys" }
+rmpi = { path = "../../sys/rmpi" }
 
 [features]
 rmpi_support = ["rmpi"]

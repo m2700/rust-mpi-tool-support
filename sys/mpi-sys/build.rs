@@ -519,7 +519,8 @@ fn main() {
             .clang_args(mpicc_args.split(' '))
             .default_enum_style(bindgen::EnumVariation::Rust {
                 non_exhaustive: true,
-            });
+            })
+            .derive_eq(true);
         for &mpi_type in &MPI_TYPES[..] {
             mpi_bindings = mpi_bindings.whitelist_type(mpi_type);
         }

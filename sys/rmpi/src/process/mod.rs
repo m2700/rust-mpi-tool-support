@@ -19,3 +19,13 @@ pub struct Process<'c> {
     pub(crate) communicator: &'c Communicator,
     pub(crate) rank: c_int,
 }
+impl<'c> Process<'c> {
+    #[inline]
+    pub fn rank(&self) -> c_int {
+        self.rank
+    }
+    #[inline]
+    pub fn communicator(&self) -> &'c Communicator {
+        self.communicator
+    }
+}

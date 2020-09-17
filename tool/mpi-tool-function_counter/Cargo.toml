@@ -13,5 +13,5 @@ crate-type = ["cdylib"]
 pmpi-tool-creator = { path = "../pmpi-tool-creator" }
 # qmpi-tool-creator = { path = "../qmpi-tool-creator" }
 mpi-tool-layer = { path = "../mpi-tool-layer", features = ["rmpi_support"] }
-
-lazy_static = "*"
+mpi_func-id = { path = "../../sys/mpi_func-id" }
+rmpi = { path = "../../sys/rmpi" }

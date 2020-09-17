@@ -18,9 +18,15 @@ tokio = { version = "*", features = ["full"] }
 cc = { version = "*", optional = true }
 
 [features]
+default = ["link_qmpi"]
+
 export_mpi = ["mpi-sys"]
 # compile qmpi from git repository
-bundled = ["cc", "mpi-sys", "mpi-sys/mpi_functions", "hyper", "hyper-rustls", "use_git_header"]
+bundled = [
+    "cc", "mpi-sys", "mpi-sys/mpi_functions", "hyper", "hyper-rustls",
+    "use_git_header", "link_qmpi"
+]
 # use git qmpi header
 use_git_header = ["hyper", "hyper-rustls"]
 tool_mode = ["mpi-sys", "mpi-sys/mpi_functions", "mpi-sys/tool_mode"]
+link_qmpi = []

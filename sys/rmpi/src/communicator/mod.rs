@@ -64,6 +64,10 @@ impl Communicator {
             rank,
         }
     }
+    #[inline]
+    pub fn current_process(&self) -> RmpiResult<Process> {
+        Ok(self.get_process(self.current_rank()?))
+    }
 
     tool_mode_item!(
         #[inline]

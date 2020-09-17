@@ -1,21 +1,56 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        Mutex,
-    },
-};
+use std::{convert::TryInto, sync::atomic::Ordering::Relaxed};
 
-use lazy_static::lazy_static;
-
+use self::rmpi::{MpiOp, RmpiContext};
+use mpi_func_id::MPI_FUNCTION_COUNT;
 use mpi_tool_layer::{RawMpiInterceptionLayer, UnsafeBox};
 use pmpi_tool_creator::{install_pmpi_layer as install_mpi_layer, mpi_sys};
+use rmpi::pmpi_mode as rmpi;
 
-lazy_static! {
-    static ref MPI_FN_COUNTER_MAP: Mutex<HashMap<&'static str, usize>> = Mutex::new(HashMap::new());
+use mpi_func_id::MpiFunctionId as FId;
+
+mod counter_array;
+use counter_array::MPI_FN_COUNTER_MAP;
+
+pub mod tool {
+    use super::install_mpi_layer;
+    install_mpi_layer!(super::MyQmpiLayer);
 }
 
 struct MyQmpiLayer;
 impl RawMpiInterceptionLayer for MyQmpiLayer {
+    #[inline]
+    fn finalize<F>(next_f: UnsafeBox<F>) -> ::std::os::raw::c_int
+    where
+        F: FnOnce() -> ::std::os::raw::c_int,
+    {
+        MPI_FN_COUNTER_MAP[FId::Finalize as usize].fetch_add(1, Relaxed);
+
+        let ctx = unsafe { RmpiContext::create_unchecked_ref() };
+        let comm_world = ctx.world();
+
+        let mut fn_counts = [0; MPI_FUNCTION_COUNT as usize];
+        for fnid in 0..fn_counts.len() {
+            let fnid = fnid as usize;
+            fn_counts[fnid] = MPI_FN_COUNTER_MAP[fnid].load(Relaxed);
+        }
+
+        let mut all_fn_counts = [0; MPI_FUNCTION_COUNT as usize];
+        comm_world
+            .allreduce(&fn_counts[..], &mut all_fn_counts[..], MpiOp::Sum)
+            .unwrap();
+
+        let res = unsafe { next_f.unwrap()() };
+
+        for fnid in 0u16.. {
+            let fnid: FId = match fnid.try_into() {
+                Ok(id) => id,
+                Err(()) => break,
+            };
+            println!("MPI_{:?}: {}", fnid, all_fn_counts[fnid as usize]);
+        }
+        res
+    }
+
     #[inline]
     fn send<F>(
         next_f: UnsafeBox<F>,
@@ -36,11 +71,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Send")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Send as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm) }
     }
     #[inline]
@@ -65,11 +96,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Recv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Recv as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, source, tag, comm, status) }
     }
     #[inline]
@@ -86,11 +113,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_count")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_count as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(status, datatype, count) }
     }
     #[inline]
@@ -113,11 +136,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Bsend")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Bsend as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm) }
     }
     #[inline]
@@ -140,11 +159,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ssend")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ssend as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm) }
     }
     #[inline]
@@ -167,11 +182,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Rsend")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Rsend as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm) }
     }
     #[inline]
@@ -183,11 +194,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_void, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Buffer_attach")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Buffer_attach as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buffer, size) }
     }
     #[inline]
@@ -199,11 +206,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_void, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Buffer_detach")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Buffer_detach as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buffer_addr, size) }
     }
     #[inline]
@@ -228,11 +231,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Isend")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Isend as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -257,11 +256,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ibsend")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ibsend as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -286,11 +281,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Issend")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Issend as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -315,11 +306,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Irsend")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Irsend as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -344,11 +331,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Irecv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Irecv as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, source, tag, comm, request) }
     }
     #[inline]
@@ -360,11 +343,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Request, *mut mpi_sys::MPI_Status) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Wait")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Wait as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(request, status) }
     }
     #[inline]
@@ -381,11 +360,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Test")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Test as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(request, flag, status) }
     }
     #[inline]
@@ -396,11 +371,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Request_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Request_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(request) }
     }
     #[inline]
@@ -419,11 +390,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Waitany")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Waitany as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, array_of_requests, indx, status) }
     }
     #[inline]
@@ -444,11 +411,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Testany")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Testany as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, array_of_requests, indx, flag, status) }
     }
     #[inline]
@@ -465,11 +428,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Waitall")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Waitall as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, array_of_requests, array_of_statuses) }
     }
     #[inline]
@@ -488,11 +447,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Testall")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Testall as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, array_of_requests, flag, array_of_statuses) }
     }
     #[inline]
@@ -513,11 +468,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Waitsome")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Waitsome as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 incount,
@@ -546,11 +497,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Testsome")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Testsome as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 incount,
@@ -579,11 +526,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iprobe")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iprobe as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(source, tag, comm, flag, status) }
     }
     #[inline]
@@ -602,11 +545,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Probe")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Probe as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(source, tag, comm, status) }
     }
     #[inline]
@@ -614,11 +553,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cancel")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cancel as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(request) }
     }
     #[inline]
@@ -630,11 +565,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*const mpi_sys::MPI_Status, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Test_cancelled")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Test_cancelled as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(status, flag) }
     }
     #[inline]
@@ -659,11 +590,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Send_init")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Send_init as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -688,11 +615,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Bsend_init")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Bsend_init as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -717,11 +640,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ssend_init")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ssend_init as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -746,11 +665,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Rsend_init")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Rsend_init as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, dest, tag, comm, request) }
     }
     #[inline]
@@ -775,11 +690,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Recv_init")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Recv_init as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, source, tag, comm, request) }
     }
     #[inline]
@@ -787,11 +698,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Start")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Start as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(request) }
     }
     #[inline]
@@ -803,11 +710,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, *mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Startall")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Startall as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, array_of_requests) }
     }
     #[inline]
@@ -842,11 +745,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Sendrecv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Sendrecv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source,
@@ -880,11 +779,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Sendrecv_replace")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Sendrecv_replace as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 buf, count, datatype, dest, sendtag, source, recvtag, comm, status,
@@ -905,11 +800,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_contiguous")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_contiguous as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, oldtype, newtype) }
     }
     #[inline]
@@ -930,11 +821,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_vector")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_vector as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, blocklength, stride, oldtype, newtype) }
     }
     #[inline]
@@ -955,11 +842,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_hvector")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_hvector as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, blocklength, stride, oldtype, newtype) }
     }
     #[inline]
@@ -980,11 +863,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_indexed")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_indexed as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 count,
@@ -1013,11 +892,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_hindexed")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_hindexed as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 count,
@@ -1046,11 +921,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_struct")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_struct as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 count,
@@ -1070,11 +941,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_void, *mut mpi_sys::MPI_Aint) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Address")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Address as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(location, address) }
     }
     #[inline]
@@ -1086,11 +953,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_extent")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_extent as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, extent) }
     }
     #[inline]
@@ -1102,11 +965,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, size) }
     }
     #[inline]
@@ -1118,11 +977,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_lb")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_lb as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, displacement) }
     }
     #[inline]
@@ -1134,11 +989,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Aint) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_ub")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_ub as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, displacement) }
     }
     #[inline]
@@ -1149,11 +1000,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Datatype) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_commit")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_commit as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype) }
     }
     #[inline]
@@ -1164,11 +1011,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Datatype) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype) }
     }
     #[inline]
@@ -1185,11 +1028,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_elements")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_elements as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(status, datatype, count) }
     }
     #[inline]
@@ -1214,11 +1053,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Pack")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Pack as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(inbuf, incount, datatype, outbuf, outsize, position, comm) }
     }
     #[inline]
@@ -1243,11 +1078,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Unpack")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Unpack as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(inbuf, insize, position, outbuf, outcount, datatype, comm) }
     }
     #[inline]
@@ -1266,11 +1097,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Pack_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Pack_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(incount, datatype, comm, size) }
     }
     #[inline]
@@ -1278,11 +1105,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Barrier")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Barrier as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm) }
     }
     #[inline]
@@ -1303,11 +1126,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Bcast")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Bcast as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buffer, count, datatype, root, comm) }
     }
     #[inline]
@@ -1334,11 +1153,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Gather")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Gather as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm,
@@ -1371,11 +1186,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Gatherv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Gatherv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root, comm,
@@ -1406,11 +1217,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Scatter")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Scatter as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm,
@@ -1443,11 +1250,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Scatterv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Scatterv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, comm,
@@ -1476,11 +1279,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Allgather")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Allgather as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
@@ -1511,11 +1310,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Allgatherv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Allgatherv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm,
@@ -1544,11 +1339,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Alltoall")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Alltoall as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
@@ -1581,11 +1372,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Alltoallv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Alltoallv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype,
@@ -1619,11 +1406,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Alltoallw")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Alltoallw as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes,
@@ -1651,11 +1434,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Exscan")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Exscan as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm) }
     }
     #[inline]
@@ -1680,11 +1459,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Reduce")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Reduce as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, root, comm) }
     }
     #[inline]
@@ -1701,11 +1476,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Op,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Op_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Op_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(user_fn, commute, op) }
     }
     #[inline]
@@ -1713,11 +1484,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Op) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Op_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Op_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(op) }
     }
     #[inline]
@@ -1740,11 +1507,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Allreduce")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Allreduce as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm) }
     }
     #[inline]
@@ -1767,11 +1530,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Reduce_scatter")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Reduce_scatter as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, recvcounts, datatype, op, comm) }
     }
     #[inline]
@@ -1794,11 +1553,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Scan")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Scan as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm) }
     }
     #[inline]
@@ -1810,11 +1565,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Group, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, size) }
     }
     #[inline]
@@ -1826,11 +1577,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Group, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_rank")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_rank as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, rank) }
     }
     #[inline]
@@ -1851,11 +1598,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_translate_ranks")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_translate_ranks as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group1, n, ranks1, group2, ranks2) }
     }
     #[inline]
@@ -1872,11 +1615,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_compare")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_compare as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group1, group2, result) }
     }
     #[inline]
@@ -1888,11 +1627,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Group) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_group")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_group as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, group) }
     }
     #[inline]
@@ -1909,11 +1644,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Group,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_union")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_union as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group1, group2, newgroup) }
     }
     #[inline]
@@ -1930,11 +1661,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Group,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_intersection")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_intersection as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group1, group2, newgroup) }
     }
     #[inline]
@@ -1951,11 +1678,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Group,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_difference")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_difference as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group1, group2, newgroup) }
     }
     #[inline]
@@ -1974,11 +1697,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Group,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_incl")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_incl as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, n, ranks, newgroup) }
     }
     #[inline]
@@ -1997,11 +1716,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Group,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_excl")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_excl as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, n, ranks, newgroup) }
     }
     #[inline]
@@ -2020,11 +1735,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Group,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_range_incl")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_range_incl as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, n, ranges, newgroup) }
     }
     #[inline]
@@ -2043,11 +1754,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Group,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_range_excl")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_range_excl as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, n, ranges, newgroup) }
     }
     #[inline]
@@ -2055,11 +1762,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Group) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Group_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Group_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group) }
     }
     #[inline]
@@ -2071,11 +1774,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, size) }
     }
     #[inline]
@@ -2087,11 +1786,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_rank")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_rank as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, rank) }
     }
     #[inline]
@@ -2108,11 +1803,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_compare")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_compare as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm1, comm2, result) }
     }
     #[inline]
@@ -2124,11 +1815,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_dup")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_dup as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, newcomm) }
     }
     #[inline]
@@ -2145,11 +1832,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_dup_with_info")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_dup_with_info as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, info, newcomm) }
     }
     #[inline]
@@ -2166,11 +1849,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, group, newcomm) }
     }
     #[inline]
@@ -2189,11 +1868,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_split")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_split as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, color, key, newcomm) }
     }
     #[inline]
@@ -2201,11 +1876,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm) }
     }
     #[inline]
@@ -2217,11 +1888,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_test_inter")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_test_inter as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, flag) }
     }
     #[inline]
@@ -2233,11 +1900,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_remote_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_remote_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, size) }
     }
     #[inline]
@@ -2249,11 +1912,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Group) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_remote_group")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_remote_group as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, group) }
     }
     #[inline]
@@ -2276,11 +1935,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Intercomm_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Intercomm_create as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 local_comm,
@@ -2306,11 +1961,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Intercomm_merge")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Intercomm_merge as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(intercomm, high, newintracomm) }
     }
     #[inline]
@@ -2329,11 +1980,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Keyval_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Keyval_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(copy_fn, delete_fn, keyval, extra_state) }
     }
     #[inline]
@@ -2344,11 +1991,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Keyval_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Keyval_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(keyval) }
     }
     #[inline]
@@ -2365,11 +2008,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Attr_put")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Attr_put as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, keyval, attribute_val) }
     }
     #[inline]
@@ -2388,11 +2027,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Attr_get")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Attr_get as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, keyval, attribute_val, flag) }
     }
     #[inline]
@@ -2404,11 +2039,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Attr_delete")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Attr_delete as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, keyval) }
     }
     #[inline]
@@ -2420,11 +2051,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Topo_test")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Topo_test as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, status) }
     }
     #[inline]
@@ -2447,11 +2074,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cart_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cart_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm_old, ndims, dims, periods, reorder, comm_cart) }
     }
     #[inline]
@@ -2468,11 +2091,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Dims_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Dims_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(nnodes, ndims, dims) }
     }
     #[inline]
@@ -2495,11 +2114,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Graph_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Graph_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm_old, nnodes, indx, edges, reorder, comm_graph) }
     }
     #[inline]
@@ -2516,11 +2131,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Graphdims_get")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Graphdims_get as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, nnodes, nedges) }
     }
     #[inline]
@@ -2541,11 +2152,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Graph_get")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Graph_get as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, maxindex, maxedges, indx, edges) }
     }
     #[inline]
@@ -2557,11 +2164,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cartdim_get")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cartdim_get as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, ndims) }
     }
     #[inline]
@@ -2582,11 +2185,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cart_get")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cart_get as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, maxdims, dims, periods, coords) }
     }
     #[inline]
@@ -2603,11 +2202,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cart_rank")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cart_rank as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, coords, rank) }
     }
     #[inline]
@@ -2626,11 +2221,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cart_coords")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cart_coords as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, rank, maxdims, coords) }
     }
     #[inline]
@@ -2647,11 +2238,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Graph_neighbors_count")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Graph_neighbors_count as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, rank, nneighbors) }
     }
     #[inline]
@@ -2670,11 +2257,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Graph_neighbors")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Graph_neighbors as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, rank, maxneighbors, neighbors) }
     }
     #[inline]
@@ -2695,11 +2278,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cart_shift")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cart_shift as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, direction, disp, rank_source, rank_dest) }
     }
     #[inline]
@@ -2716,11 +2295,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cart_sub")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cart_sub as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, remain_dims, newcomm) }
     }
     #[inline]
@@ -2741,11 +2316,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Cart_map")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Cart_map as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, ndims, dims, periods, newrank) }
     }
     #[inline]
@@ -2766,11 +2337,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Graph_map")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Graph_map as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, nnodes, indx, edges, newrank) }
     }
     #[inline]
@@ -2782,11 +2349,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_char, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_processor_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_processor_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(name, resultlen) }
     }
     #[inline]
@@ -2798,11 +2361,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_version")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_version as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(version, subversion) }
     }
     #[inline]
@@ -2814,11 +2373,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_char, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_library_version")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_library_version as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(version, resultlen) }
     }
     #[inline]
@@ -2833,11 +2388,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Errhandler,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Errhandler_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Errhandler_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(function, errhandler) }
     }
     #[inline]
@@ -2849,11 +2400,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Errhandler_set")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Errhandler_set as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, errhandler) }
     }
     #[inline]
@@ -2865,11 +2412,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Errhandler_get")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Errhandler_get as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, errhandler) }
     }
     #[inline]
@@ -2880,11 +2423,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Errhandler_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Errhandler_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(errhandler) }
     }
     #[inline]
@@ -2901,11 +2440,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Error_string")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Error_string as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(errorcode, string, resultlen) }
     }
     #[inline]
@@ -2917,11 +2452,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Error_class")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Error_class as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(errorcode, errorclass) }
     }
     #[inline]
@@ -2929,11 +2460,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce() -> f64,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Wtime")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Wtime as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()() }
     }
     #[inline]
@@ -2941,11 +2468,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce() -> f64,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Wtick")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Wtick as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()() }
     }
     #[inline]
@@ -2960,26 +2483,8 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut *mut *mut ::std::os::raw::c_char,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Init")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Init as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(argc, argv) }
-    }
-    #[inline]
-    fn finalize<F>(next_f: UnsafeBox<F>) -> ::std::os::raw::c_int
-    where
-        F: FnOnce() -> ::std::os::raw::c_int,
-    {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Finalize")
-            .or_insert(0) += 1;
-        let res = unsafe { next_f.unwrap()() };
-        dbg!(&*MPI_FN_COUNTER_MAP.lock().unwrap());
-        res
     }
     #[inline]
     fn initialized<F>(
@@ -2989,11 +2494,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Initialized")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Initialized as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(flag) }
     }
     #[inline]
@@ -3005,11 +2506,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Abort")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Abort as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, errorcode) }
     }
     #[inline]
@@ -3017,11 +2514,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Pcontrol")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Pcontrol as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(level) }
     }
     #[inline]
@@ -3032,11 +2525,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*const ::std::os::raw::c_char) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Close_port")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Close_port as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(port_name) }
     }
     #[inline]
@@ -3057,11 +2546,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_accept")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_accept as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(port_name, info, root, comm, newcomm) }
     }
     #[inline]
@@ -3082,11 +2567,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_connect")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_connect as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(port_name, info, root, comm, newcomm) }
     }
     #[inline]
@@ -3097,11 +2578,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_disconnect")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_disconnect as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm) }
     }
     #[inline]
@@ -3112,11 +2589,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_get_parent")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_get_parent as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(parent) }
     }
     #[inline]
@@ -3128,11 +2601,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, *mut mpi_sys::MPI_Comm) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_join")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_join as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fd, intercomm) }
     }
     #[inline]
@@ -3149,11 +2618,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_char,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Lookup_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Lookup_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(service_name, info, port_name) }
     }
     #[inline]
@@ -3165,11 +2630,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Info, *mut ::std::os::raw::c_char) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Open_port")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Open_port as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, port_name) }
     }
     #[inline]
@@ -3186,11 +2647,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *const ::std::os::raw::c_char,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Publish_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Publish_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(service_name, info, port_name) }
     }
     #[inline]
@@ -3207,11 +2664,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *const ::std::os::raw::c_char,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Unpublish_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Unpublish_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(service_name, info, port_name) }
     }
     #[inline]
@@ -3223,11 +2676,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_set_info")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_set_info as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, info) }
     }
     #[inline]
@@ -3239,11 +2688,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_get_info")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_get_info as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, info) }
     }
     #[inline]
@@ -3272,11 +2717,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Accumulate")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Accumulate as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3315,7 +2756,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP.lock().unwrap().entry("Get").or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3353,7 +2794,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP.lock().unwrap().entry("Put").or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Put as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3372,11 +2813,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_complete")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_complete as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
@@ -3399,11 +2836,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(base, size, disp_unit, info, comm, win) }
     }
     #[inline]
@@ -3415,11 +2848,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_fence")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_fence as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(assert, win) }
     }
     #[inline]
@@ -3427,11 +2856,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
@@ -3443,11 +2868,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, *mut mpi_sys::MPI_Group) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_get_group")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_get_group as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, group) }
     }
     #[inline]
@@ -3466,11 +2887,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_lock")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_lock as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(lock_type, rank, assert, win) }
     }
     #[inline]
@@ -3487,11 +2904,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_post")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_post as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, assert, win) }
     }
     #[inline]
@@ -3508,11 +2921,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_start")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_start as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(group, assert, win) }
     }
     #[inline]
@@ -3524,11 +2933,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_test")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_test as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, flag) }
     }
     #[inline]
@@ -3540,11 +2945,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_unlock")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_unlock as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(rank, win) }
     }
     #[inline]
@@ -3552,11 +2953,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_wait")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_wait as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
@@ -3579,11 +2976,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_allocate")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_allocate as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(size, disp_unit, info, comm, baseptr, win) }
     }
     #[inline]
@@ -3606,11 +2999,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_allocate_shared")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_allocate_shared as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(size, disp_unit, info, comm, baseptr, win) }
     }
     #[inline]
@@ -3631,11 +3020,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_shared_query")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_shared_query as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, rank, size, disp_unit, baseptr) }
     }
     #[inline]
@@ -3652,11 +3037,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_create_dynamic")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_create_dynamic as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, comm, win) }
     }
     #[inline]
@@ -3673,11 +3054,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Aint,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_attach")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_attach as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, base, size) }
     }
     #[inline]
@@ -3689,11 +3066,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, *const ::std::os::raw::c_void) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_detach")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_detach as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, base) }
     }
     #[inline]
@@ -3705,11 +3078,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, *mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_get_info")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_get_info as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, info_used) }
     }
     #[inline]
@@ -3721,11 +3090,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_set_info")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_set_info as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, info) }
     }
     #[inline]
@@ -3760,11 +3125,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_accumulate")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_accumulate as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3804,11 +3165,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Fetch_and_op")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Fetch_and_op as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3843,11 +3200,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Win,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Compare_and_swap")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Compare_and_swap as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3886,11 +3239,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Rput")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Rput as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3931,11 +3280,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Rget")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Rget as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -3978,11 +3323,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Raccumulate")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Raccumulate as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -4032,11 +3373,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Rget_accumulate")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Rget_accumulate as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 origin_addr,
@@ -4064,11 +3401,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_lock_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_lock_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(assert, win) }
     }
     #[inline]
@@ -4076,11 +3409,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_unlock_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_unlock_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
@@ -4092,11 +3421,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_flush")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_flush as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(rank, win) }
     }
     #[inline]
@@ -4104,11 +3429,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_flush_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_flush_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
@@ -4120,11 +3441,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_flush_local")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_flush_local as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(rank, win) }
     }
     #[inline]
@@ -4132,11 +3449,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_flush_local_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_flush_local_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
@@ -4144,11 +3457,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_sync")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_sync as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win) }
     }
     #[inline]
@@ -4159,11 +3468,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Add_error_class")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Add_error_class as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(errorclass) }
     }
     #[inline]
@@ -4175,11 +3480,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Add_error_code")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Add_error_code as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(errorclass, errorcode) }
     }
     #[inline]
@@ -4191,11 +3492,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, *const ::std::os::raw::c_char) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Add_error_string")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Add_error_string as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(errorcode, string) }
     }
     #[inline]
@@ -4207,11 +3504,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_call_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_call_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, errorcode) }
     }
     #[inline]
@@ -4230,11 +3523,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_create_keyval")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_create_keyval as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 comm_copy_attr_fn,
@@ -4253,11 +3542,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_delete_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_delete_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, comm_keyval) }
     }
     #[inline]
@@ -4268,11 +3553,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_free_keyval")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_free_keyval as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm_keyval) }
     }
     #[inline]
@@ -4291,11 +3572,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_get_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_get_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, comm_keyval, attribute_val, flag) }
     }
     #[inline]
@@ -4312,11 +3589,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_get_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_get_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, comm_name, resultlen) }
     }
     #[inline]
@@ -4333,11 +3606,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_set_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_set_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, comm_keyval, attribute_val) }
     }
     #[inline]
@@ -4349,11 +3618,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *const ::std::os::raw::c_char) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_set_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_set_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, comm_name) }
     }
     #[inline]
@@ -4365,11 +3630,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_call_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_call_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, errorcode) }
     }
     #[inline]
@@ -4380,11 +3641,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Grequest_complete")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Grequest_complete as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(request) }
     }
     #[inline]
@@ -4405,11 +3662,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Grequest_start")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Grequest_start as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(query_fn, free_fn, cancel_fn, extra_state, request) }
     }
     #[inline]
@@ -4428,11 +3681,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Init_thread")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Init_thread as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(argc, argv, required, provided) }
     }
     #[inline]
@@ -4443,11 +3692,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Is_thread_main")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Is_thread_main as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(flag) }
     }
     #[inline]
@@ -4458,11 +3703,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Query_thread")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Query_thread as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(provided) }
     }
     #[inline]
@@ -4474,11 +3715,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Status, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Status_set_cancelled")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Status_set_cancelled as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(status, flag) }
     }
     #[inline]
@@ -4495,11 +3732,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Status_set_elements")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Status_set_elements as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(status, datatype, count) }
     }
     #[inline]
@@ -4518,11 +3751,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_keyval")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_keyval as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 type_copy_attr_fn,
@@ -4541,11 +3770,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_delete_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_delete_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, type_keyval) }
     }
     #[inline]
@@ -4557,11 +3782,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Datatype) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_dup")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_dup as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(oldtype, newtype) }
     }
     #[inline]
@@ -4572,11 +3793,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_free_keyval")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_free_keyval as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(type_keyval) }
     }
     #[inline]
@@ -4595,11 +3812,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, type_keyval, attribute_val, flag) }
     }
     #[inline]
@@ -4624,11 +3837,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_contents")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_contents as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 datatype,
@@ -4659,11 +3868,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_envelope")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_envelope as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 datatype,
@@ -4688,11 +3893,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, type_name, resultlen) }
     }
     #[inline]
@@ -4709,11 +3910,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_set_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_set_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, type_keyval, attribute_val) }
     }
     #[inline]
@@ -4725,11 +3922,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, *const ::std::os::raw::c_char) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_set_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_set_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, type_name) }
     }
     #[inline]
@@ -4746,11 +3939,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_match_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_match_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(typeclass, size, datatype) }
     }
     #[inline]
@@ -4762,11 +3951,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_call_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_call_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, errorcode) }
     }
     #[inline]
@@ -4785,11 +3970,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_create_keyval")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_create_keyval as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 win_copy_attr_fn,
@@ -4808,11 +3989,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_delete_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_delete_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, win_keyval) }
     }
     #[inline]
@@ -4823,11 +4000,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_free_keyval")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_free_keyval as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win_keyval) }
     }
     #[inline]
@@ -4846,11 +4019,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_get_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_get_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, win_keyval, attribute_val, flag) }
     }
     #[inline]
@@ -4867,11 +4036,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_get_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_get_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, win_name, resultlen) }
     }
     #[inline]
@@ -4888,11 +4053,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_set_attr")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_set_attr as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, win_keyval, attribute_val) }
     }
     #[inline]
@@ -4904,11 +4065,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, *const ::std::os::raw::c_char) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_set_name")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_set_name as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, win_name) }
     }
     #[inline]
@@ -4925,11 +4082,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Alloc_mem")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Alloc_mem as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(size, info, baseptr) }
     }
     #[inline]
@@ -4944,11 +4097,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Errhandler,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_create_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_create_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm_errhandler_fn, errhandler) }
     }
     #[inline]
@@ -4960,11 +4109,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_get_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_get_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, errhandler) }
     }
     #[inline]
@@ -4976,11 +4121,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_set_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_set_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, errhandler) }
     }
     #[inline]
@@ -4995,11 +4136,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Errhandler,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_create_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_create_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(file_errhandler_fn, errhandler) }
     }
     #[inline]
@@ -5011,11 +4148,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(file, errhandler) }
     }
     #[inline]
@@ -5027,11 +4160,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_set_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_set_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(file, errhandler) }
     }
     #[inline]
@@ -5039,11 +4168,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Finalized")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Finalized as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(flag) }
     }
     #[inline]
@@ -5051,11 +4176,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut ::std::os::raw::c_void) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Free_mem")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Free_mem as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(base) }
     }
     #[inline]
@@ -5067,11 +4188,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*const ::std::os::raw::c_void, *mut mpi_sys::MPI_Aint) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_address")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_address as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(location, address) }
     }
     #[inline]
@@ -5079,11 +4196,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_create as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info) }
     }
     #[inline]
@@ -5095,11 +4208,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Info, *const ::std::os::raw::c_char) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_delete")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_delete as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, key) }
     }
     #[inline]
@@ -5111,11 +4220,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Info, *mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_dup")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_dup as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, newinfo) }
     }
     #[inline]
@@ -5123,11 +4228,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_free")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_free as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info) }
     }
     #[inline]
@@ -5148,11 +4249,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_get")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_get as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, key, valuelen, value, flag) }
     }
     #[inline]
@@ -5164,11 +4261,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Info, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_get_nkeys")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_get_nkeys as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, nkeys) }
     }
     #[inline]
@@ -5185,11 +4278,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_char,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_get_nthkey")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_get_nthkey as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, n, key) }
     }
     #[inline]
@@ -5208,11 +4297,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_get_valuelen")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_get_valuelen as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, key, valuelen, flag) }
     }
     #[inline]
@@ -5229,11 +4314,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *const ::std::os::raw::c_char,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Info_set")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Info_set as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(info, key, value) }
     }
     #[inline]
@@ -5258,11 +4339,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Aint,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Pack_external")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Pack_external as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datarep, inbuf, incount, datatype, outbuf, outsize, position) }
     }
     #[inline]
@@ -5281,11 +4358,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Aint,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Pack_external_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Pack_external_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datarep, incount, datatype, size) }
     }
     #[inline]
@@ -5302,11 +4375,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Request_get_status")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Request_get_status as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(request, flag, status) }
     }
     #[inline]
@@ -5337,11 +4406,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_darray")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_darray as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 size,
@@ -5375,11 +4440,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_hindexed")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_hindexed as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 count,
@@ -5408,11 +4469,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_hvector")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_hvector as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, blocklength, stride, oldtype, newtype) }
     }
     #[inline]
@@ -5433,11 +4490,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_indexed_block")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_indexed_block as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, blocklength, array_of_displacements, oldtype, newtype) }
     }
     #[inline]
@@ -5458,11 +4511,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_hindexed_block")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_hindexed_block as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(count, blocklength, array_of_displacements, oldtype, newtype) }
     }
     #[inline]
@@ -5481,11 +4530,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_resized")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_resized as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(oldtype, lb, extent, newtype) }
     }
     #[inline]
@@ -5506,11 +4551,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_struct")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_struct as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 count,
@@ -5543,11 +4584,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_subarray")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_subarray as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 ndims,
@@ -5574,11 +4611,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Aint,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_extent")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_extent as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, lb, extent) }
     }
     #[inline]
@@ -5595,11 +4628,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Aint,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_true_extent")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_true_extent as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, true_lb, true_extent) }
     }
     #[inline]
@@ -5624,11 +4653,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Unpack_external")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Unpack_external as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datarep, inbuf, insize, position, outbuf, outcount, datatype) }
     }
     #[inline]
@@ -5643,11 +4668,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Errhandler,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_create_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_create_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win_errhandler_fn, errhandler) }
     }
     #[inline]
@@ -5659,11 +4680,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, *mut mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_get_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_get_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, errhandler) }
     }
     #[inline]
@@ -5675,11 +4692,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Win, mpi_sys::MPI_Errhandler) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Win_set_errhandler")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Win_set_errhandler as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(win, errhandler) }
     }
     #[inline]
@@ -5691,11 +4704,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(::std::os::raw::c_int, *mut mpi_sys::MPI_Datatype) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_f90_integer")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_f90_integer as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(range, newtype) }
     }
     #[inline]
@@ -5712,11 +4721,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_f90_real")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_f90_real as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(precision, range, newtype) }
     }
     #[inline]
@@ -5733,11 +4738,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_create_f90_complex")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_create_f90_complex as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(precision, range, newtype) }
     }
     #[inline]
@@ -5758,11 +4759,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Op,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Reduce_local")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Reduce_local as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(inbuf, inoutbuf, count, datatype, op) }
     }
     #[inline]
@@ -5774,11 +4771,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Op, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Op_commutative")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Op_commutative as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(op, commute) }
     }
     #[inline]
@@ -5801,11 +4794,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Reduce_scatter_block")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Reduce_scatter_block as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, recvcount, datatype, op, comm) }
     }
     #[inline]
@@ -5836,11 +4825,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Dist_graph_create_adjacent")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Dist_graph_create_adjacent as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 comm_old,
@@ -5882,11 +4867,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Dist_graph_create")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Dist_graph_create as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 comm_old,
@@ -5917,11 +4898,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Dist_graph_neighbors_count")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Dist_graph_neighbors_count as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, indegree, outdegree, weighted) }
     }
     #[inline]
@@ -5946,11 +4923,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Dist_graph_neighbors")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Dist_graph_neighbors as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 comm,
@@ -5983,11 +4956,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Improbe")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Improbe as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(source, tag, comm, flag, message, status) }
     }
     #[inline]
@@ -6008,11 +4977,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Imrecv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Imrecv as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, message, request) }
     }
     #[inline]
@@ -6033,11 +4998,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Mprobe")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Mprobe as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(source, tag, comm, message, status) }
     }
     #[inline]
@@ -6058,11 +5019,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Mrecv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Mrecv as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buf, count, datatype, message, status) }
     }
     #[inline]
@@ -6079,11 +5036,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_idup")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_idup as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, newcomm, request) }
     }
     #[inline]
@@ -6095,11 +5048,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Comm, *mut mpi_sys::MPI_Request) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ibarrier")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ibarrier as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, request) }
     }
     #[inline]
@@ -6122,11 +5071,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ibcast")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ibcast as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(buffer, count, datatype, root, comm, request) }
     }
     #[inline]
@@ -6155,11 +5100,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Igather")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Igather as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm, request,
@@ -6194,11 +5135,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Igatherv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Igatherv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root, comm,
@@ -6232,11 +5169,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iscatter")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iscatter as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm, request,
@@ -6271,11 +5204,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iscatterv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iscatterv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, comm,
@@ -6307,11 +5236,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iallgather")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iallgather as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
@@ -6344,11 +5269,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iallgatherv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iallgatherv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm, request,
@@ -6379,11 +5300,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ialltoall")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ialltoall as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
@@ -6418,11 +5335,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ialltoallv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ialltoallv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype,
@@ -6458,11 +5371,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ialltoallw")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ialltoallw as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes,
@@ -6494,11 +5403,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ireduce")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ireduce as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, root, comm, request) }
     }
     #[inline]
@@ -6523,11 +5428,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iallreduce")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iallreduce as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm, request) }
     }
     #[inline]
@@ -6552,11 +5453,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ireduce_scatter")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ireduce_scatter as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, recvcounts, datatype, op, comm, request) }
     }
     #[inline]
@@ -6581,11 +5478,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ireduce_scatter_block")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ireduce_scatter_block as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, recvcount, datatype, op, comm, request) }
     }
     #[inline]
@@ -6610,11 +5503,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iscan")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iscan as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm, request) }
     }
     #[inline]
@@ -6639,11 +5528,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Iexscan")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Iexscan as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm, request) }
     }
     #[inline]
@@ -6670,11 +5555,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ineighbor_allgather")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ineighbor_allgather as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
@@ -6707,11 +5588,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ineighbor_allgatherv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ineighbor_allgatherv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm, request,
@@ -6742,11 +5619,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ineighbor_alltoall")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ineighbor_alltoall as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm, request,
@@ -6781,11 +5654,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ineighbor_alltoallv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ineighbor_alltoallv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype,
@@ -6821,11 +5690,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Ineighbor_alltoallw")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Ineighbor_alltoallw as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes,
@@ -6855,11 +5720,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Neighbor_allgather")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Neighbor_allgather as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
@@ -6890,11 +5751,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Neighbor_allgatherv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Neighbor_allgatherv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm,
@@ -6923,11 +5780,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Neighbor_alltoall")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Neighbor_alltoall as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm,
@@ -6960,11 +5813,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Neighbor_alltoallv")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Neighbor_alltoallv as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype,
@@ -6998,11 +5847,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Neighbor_alltoallw")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Neighbor_alltoallw as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes,
@@ -7028,11 +5873,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_split_type")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_split_type as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, split_type, key, info, newcomm) }
     }
     #[inline]
@@ -7049,11 +5890,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Count,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Get_elements_x")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Get_elements_x as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(status, datatype, count) }
     }
     #[inline]
@@ -7070,11 +5907,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Count,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Status_set_elements_x")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Status_set_elements_x as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(status, datatype, count) }
     }
     #[inline]
@@ -7091,11 +5924,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Count,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_extent_x")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_extent_x as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, lb, extent) }
     }
     #[inline]
@@ -7112,11 +5941,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Count,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_get_true_extent_x")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_get_true_extent_x as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, lb, extent) }
     }
     #[inline]
@@ -7128,11 +5953,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_Datatype, *mut mpi_sys::MPI_Count) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Type_size_x")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Type_size_x as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(datatype, size) }
     }
     #[inline]
@@ -7151,11 +5972,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Comm,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Comm_create_group")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Comm_create_group as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, group, tag, newcomm) }
     }
     #[inline]
@@ -7176,11 +5993,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_File,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_open")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_open as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(comm, filename, amode, info, fh) }
     }
     #[inline]
@@ -7188,11 +6001,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*mut mpi_sys::MPI_File) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_close")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_close as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh) }
     }
     #[inline]
@@ -7204,11 +6013,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(*const ::std::os::raw::c_char, mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_delete")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_delete as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(filename, info) }
     }
     #[inline]
@@ -7220,11 +6025,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Offset) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_set_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_set_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, size) }
     }
     #[inline]
@@ -7236,11 +6037,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Offset) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_preallocate")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_preallocate as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, size) }
     }
     #[inline]
@@ -7252,11 +6049,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Offset) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_size")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_size as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, size) }
     }
     #[inline]
@@ -7268,11 +6061,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Group) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_group")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_group as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, group) }
     }
     #[inline]
@@ -7284,11 +6073,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_amode")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_amode as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, amode) }
     }
     #[inline]
@@ -7300,11 +6085,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_set_info")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_set_info as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, info) }
     }
     #[inline]
@@ -7316,11 +6097,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Info) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_info")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_info as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, info_used) }
     }
     #[inline]
@@ -7343,11 +6120,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Info,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_set_view")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_set_view as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, disp, etype, filetype, datarep, info) }
     }
     #[inline]
@@ -7368,11 +6141,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_char,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_view")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_view as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, disp, etype, filetype, datarep) }
     }
     #[inline]
@@ -7395,11 +6164,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_at")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_at as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, status) }
     }
     #[inline]
@@ -7422,11 +6187,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_at_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_at_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, status) }
     }
     #[inline]
@@ -7449,11 +6210,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_at")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_at as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, status) }
     }
     #[inline]
@@ -7476,11 +6233,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_at_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_at_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, status) }
     }
     #[inline]
@@ -7503,11 +6256,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iread_at")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iread_at as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, request) }
     }
     #[inline]
@@ -7530,11 +6279,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iwrite_at")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iwrite_at as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, request) }
     }
     #[inline]
@@ -7555,11 +6300,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7580,11 +6321,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7605,11 +6342,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7630,11 +6363,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7655,11 +6384,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iread")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iread as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, request) }
     }
     #[inline]
@@ -7680,11 +6405,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iwrite")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iwrite as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, request) }
     }
     #[inline]
@@ -7701,11 +6422,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_seek")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_seek as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, whence) }
     }
     #[inline]
@@ -7717,11 +6434,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Offset) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_position")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_position as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset) }
     }
     #[inline]
@@ -7738,11 +6451,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Offset,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_byte_offset")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_byte_offset as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, disp) }
     }
     #[inline]
@@ -7763,11 +6472,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_shared")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_shared as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7788,11 +6493,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_shared")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_shared as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7813,11 +6514,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iread_shared")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iread_shared as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, request) }
     }
     #[inline]
@@ -7838,11 +6535,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iwrite_shared")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iwrite_shared as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, request) }
     }
     #[inline]
@@ -7863,11 +6556,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_ordered")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_ordered as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7888,11 +6577,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_ordered")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_ordered as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, status) }
     }
     #[inline]
@@ -7909,11 +6594,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_seek_shared")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_seek_shared as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, whence) }
     }
     #[inline]
@@ -7925,11 +6606,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut mpi_sys::MPI_Offset) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_position_shared")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_position_shared as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset) }
     }
     #[inline]
@@ -7950,11 +6627,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_at_all_begin")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_at_all_begin as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype) }
     }
     #[inline]
@@ -7971,11 +6644,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_at_all_end")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_at_all_end as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, status) }
     }
     #[inline]
@@ -7996,11 +6665,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_at_all_begin")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_at_all_begin as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype) }
     }
     #[inline]
@@ -8017,11 +6682,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_at_all_end")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_at_all_end as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, status) }
     }
     #[inline]
@@ -8040,11 +6701,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_all_begin")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_all_begin as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype) }
     }
     #[inline]
@@ -8061,11 +6718,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_all_end")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_all_end as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, status) }
     }
     #[inline]
@@ -8084,11 +6737,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_all_begin")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_all_begin as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype) }
     }
     #[inline]
@@ -8105,11 +6754,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_all_end")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_all_end as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, status) }
     }
     #[inline]
@@ -8128,11 +6773,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_ordered_begin")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_ordered_begin as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype) }
     }
     #[inline]
@@ -8149,11 +6790,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_read_ordered_end")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_read_ordered_end as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, status) }
     }
     #[inline]
@@ -8172,11 +6809,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             mpi_sys::MPI_Datatype,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_ordered_begin")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_ordered_begin as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype) }
     }
     #[inline]
@@ -8193,11 +6826,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Status,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_write_ordered_end")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_write_ordered_end as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, status) }
     }
     #[inline]
@@ -8214,11 +6843,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Aint,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_type_extent")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_type_extent as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, datatype, extent) }
     }
     #[inline]
@@ -8239,11 +6864,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut ::std::os::raw::c_void,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("Register_datarep")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::Register_datarep as usize].fetch_add(1, Relaxed);
         unsafe {
             next_f.unwrap()(
                 datarep,
@@ -8263,11 +6884,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_set_atomicity")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_set_atomicity as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, flag) }
     }
     #[inline]
@@ -8279,11 +6896,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File, *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_get_atomicity")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_get_atomicity as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, flag) }
     }
     #[inline]
@@ -8291,11 +6904,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(mpi_sys::MPI_File) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_sync")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_sync as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh) }
     }
     #[inline]
@@ -8318,11 +6927,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iread_at_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iread_at_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, request) }
     }
     #[inline]
@@ -8345,11 +6950,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iwrite_at_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iwrite_at_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, offset, buf, count, datatype, request) }
     }
     #[inline]
@@ -8370,11 +6971,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iread_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iread_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, request) }
     }
     #[inline]
@@ -8395,16 +6992,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
             *mut mpi_sys::MPI_Request,
         ) -> ::std::os::raw::c_int,
     {
-        *MPI_FN_COUNTER_MAP
-            .lock()
-            .unwrap()
-            .entry("File_iwrite_all")
-            .or_insert(0) += 1;
+        MPI_FN_COUNTER_MAP[FId::File_iwrite_all as usize].fetch_add(1, Relaxed);
         unsafe { next_f.unwrap()(fh, buf, count, datatype, request) }
     }
-}
-
-pub mod tool {
-    use super::install_mpi_layer;
-    install_mpi_layer!(super::MyQmpiLayer);
 }

@@ -10,9 +10,10 @@ use cnum::Complex;
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Error, RmpiResult};
+    use crate::{Error, RmpiResult, BufferRefKind, BufferMutKind};
 );
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct CppBool(u8);
 impl From<bool> for CppBool {
@@ -38,15 +39,29 @@ impl From<CppBool> for bool {
 /// is unsafe because the type has to be transmutable to a byte array
 pub unsafe trait MpiPredefinedDatatype {
     fn datatype() -> DatatypeRef<'static>;
+    fn buffer_ref_kind(buffer: &[Self]) -> BufferRefKind
+    where
+        Self: Sized;
+    fn buffer_mut_kind(buffer: &mut [Self]) -> BufferMutKind
+    where
+        Self: Sized;
 }
 
 macro_rules! unsafe_impl_mpi_predefined_datatype {
-    ( $( $tp:ty : $dttp:expr ),* ) => {
+    ( $( $tp:ty: $bfk:ident : $dttp:expr ),* ) => {
         $(
             unsafe impl MpiPredefinedDatatype for $tp {
                 #[inline]
                 fn datatype() -> DatatypeRef<'static> {
                     unsafe{ DatatypeRef::from_raw_predefined($dttp) }
+                }
+                #[inline]
+                fn buffer_ref_kind(buffer: &[Self]) -> BufferRefKind {
+                    BufferRefKind::$bfk(buffer)
+                }
+                #[inline]
+                fn buffer_mut_kind(buffer: &mut [Self]) -> BufferMutKind {
+                    BufferMutKind::$bfk(buffer)
                 }
             }
         )*
@@ -54,25 +69,55 @@ macro_rules! unsafe_impl_mpi_predefined_datatype {
 }
 
 unsafe_impl_mpi_predefined_datatype!(
-    u8: MPI_UINT8_T,
-    u16: MPI_UINT16_T,
-    u32: MPI_UINT32_T,
-    u64: MPI_UINT64_T,
-    i8: MPI_INT8_T,
-    i16: MPI_INT16_T,
-    i32: MPI_INT32_T,
-    i64: MPI_INT64_T,
-    c_float: MPI_FLOAT,
-    c_double: MPI_DOUBLE,
-    CppBool: MPI_C_BOOL,
-    Complex<c_float>: MPI_C_FLOAT_COMPLEX,
-    Complex<c_double>: MPI_C_DOUBLE_COMPLEX,
-    LongInt: MPI_LONG_INT,
-    DoubleInt: MPI_DOUBLE_INT,
-    ShortInt: MPI_SHORT_INT,
-    TwoInt: MPI_2INT,
-    LongDoubleInt: MPI_LONG_DOUBLE_INT
+    u8: U8: MPI_UINT8_T,
+    u16: U16: MPI_UINT16_T,
+    u32: U32: MPI_UINT32_T,
+    u64: U64: MPI_UINT64_T,
+    i8: I8: MPI_INT8_T,
+    i16: I16: MPI_INT16_T,
+    i32: I32: MPI_INT32_T,
+    i64: I64: MPI_INT64_T,
+    c_float: Float: MPI_FLOAT,
+    c_double: Double: MPI_DOUBLE,
+    CppBool: CppBool: MPI_C_BOOL,
+    Complex<c_float>: ComplexFloat: MPI_C_FLOAT_COMPLEX,
+    Complex<c_double>: ComplexDouble: MPI_C_DOUBLE_COMPLEX,
+    LongInt: LongInt: MPI_LONG_INT,
+    DoubleInt: DoubleInt: MPI_DOUBLE_INT,
+    ShortInt: ShortInt: MPI_SHORT_INT,
+    TwoInt: TwoInt: MPI_2INT,
+    LongDoubleInt: LongDoubleInt: MPI_LONG_DOUBLE_INT
 );
+
+macro_rules! unsafe_transmute_impl_mpi_predefined_datatype {
+    ( $( $tp:ty: $bfk:ident : $dttp:expr ),* ) => {
+        $(
+            unsafe impl MpiPredefinedDatatype for $tp {
+                #[inline]
+                fn datatype() -> DatatypeRef<'static> {
+                    unsafe{ DatatypeRef::from_raw_predefined($dttp) }
+                }
+                #[inline]
+                fn buffer_ref_kind(buffer: &[Self]) -> BufferRefKind {
+                    BufferRefKind::$bfk(unsafe{transmute(buffer)})
+                }
+                #[inline]
+                fn buffer_mut_kind(buffer: &mut [Self]) -> BufferMutKind {
+                    BufferMutKind::$bfk(unsafe{transmute(buffer)})
+                }
+            }
+        )*
+    };
+}
+
+#[cfg(target_pointer_width = "8")]
+unsafe_transmute_impl_mpi_predefined_datatype!(usize: U8: MPI_UINT8_T, isize: I8: MPI_INT8_T);
+#[cfg(target_pointer_width = "16")]
+unsafe_transmute_impl_mpi_predefined_datatype!(usize: U16: MPI_UINT16_T, isize: I16: MPI_INT16_T);
+#[cfg(target_pointer_width = "32")]
+unsafe_transmute_impl_mpi_predefined_datatype!(usize: U32: MPI_UINT32_T, isize: I32: MPI_INT32_T);
+#[cfg(target_pointer_width = "64")]
+unsafe_transmute_impl_mpi_predefined_datatype!(usize: U64: MPI_UINT64_T, isize: I64: MPI_INT64_T);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum DatatypeKind {
@@ -84,7 +129,7 @@ use DatatypeKind::*;
 /// Raw committed datatype.
 /// Does not implement Copy or Clone,
 /// as it would violate the lifetime restriction if the datatype is not mpi-predefined
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct RawDatatype(MPI_Datatype);
 impl RawDatatype {

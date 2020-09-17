@@ -116,7 +116,7 @@ async fn main() {
         .warnings(false)
         .extra_warnings(false)
         .compile("qmpi");
-    #[cfg(not(feature = "bundled"))]
+    #[cfg(all(not(feature = "bundled"), feature = "link_qmpi"))]
     println!("cargo:rustc-link-lib=qmpi");
 
     if !qmpi_bindings_path.exists() || mtime!(&qmpi_bindings_path) < mtime!("build.rs") {
@@ -139,8 +139,7 @@ async fn main() {
         let bindgen_builder =
             bindgen::builder().header_contents("qmpi_include.h", "#include <qmpi.h>");
 
-        // #[allow(unused_mut)]
-        bindgen_builder
+        let qmpi_bindings = bindgen_builder
             .clang_args(mpicc_args.split(' '))
             .default_enum_style(bindgen::EnumVariation::Rust {
                 non_exhaustive: true,
@@ -148,10 +147,12 @@ async fn main() {
             .whitelist_var("NUM_MPI_FUNCS")
             .whitelist_type("vector")
             .whitelist_type("_MPI_funcs")
-            .whitelist_type("mpi_func")
+            .whitelist_type("mpi_func");
+        #[cfg(feature = "link_qmpi")]
+        let qmpi_bindings = qmpi_bindings
             .whitelist_function("vector_get")
-            .whitelist_function("QMPI_Table_query")
-            .whitelist_function("query_next_function")
+            .whitelist_function("QMPI_Table_query");
+        qmpi_bindings
             .generate()
             .unwrap()
             .write_to_file(qmpi_bindings_path)
