@@ -10,7 +10,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-pmpi-tool-creator = { path = "../pmpi-tool-creator" }
+qmpi-tool-creator = { path = "../qmpi-tool-creator" }
 # qmpi-tool-creator = { path = "../qmpi-tool-creator" }
 mpi-tool-layer = { path = "../mpi-tool-layer", features = ["rmpi_support"] }
 mpi_func-id = { path = "../../sys/mpi_func-id" }
