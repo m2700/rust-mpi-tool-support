@@ -94,9 +94,7 @@ tool_mode_item!(
                 ),
                 None => &mut [],
             };
-            Some(RmpiContext {
-                not_send_marker: PhantomData,
-            })
+            Some(RmpiContext::create_unchecked())
         })
     }
 );
@@ -121,6 +119,12 @@ impl Drop for RmpiContext {
 }
 impl RmpiContext {
     #[inline]
+    pub unsafe fn create_unchecked() -> Self {
+        Self {
+            not_send_marker: PhantomData,
+        }
+    }
+    #[inline]
     pub unsafe fn create_unchecked_ref() -> &'static Self {
         &*NonNull::dangling().as_ptr()
     }
@@ -128,9 +132,19 @@ impl RmpiContext {
     pub fn world(&self) -> Communicator {
         unsafe { Communicator::from_raw(MPI_COMM_WORLD) }
     }
+
+    tool_mode_item!(
+        #[inline]
+        pub unsafe fn finalize_with<F>(self, mpi_finalize: F) -> RmpiResult
+        where
+            F: FnOnce() -> c_int,
+        {
+            forget(self);
+            Error::from_mpi_res(mpi_finalize())
+        }
+    );
     #[inline]
     pub fn finalize(self) -> RmpiResult {
-        forget(self);
-        Error::from_mpi_res(unsafe { MPI_Finalize() })
+        unsafe { self.finalize_with(|| MPI_Finalize()) }
     }
 }

@@ -1,6 +1,8 @@
 mod raw_layer;
+mod unsafe_box;
 
-pub use raw_layer::{RawMpiInterceptionLayer, UnsafeBox};
+pub use raw_layer::RawMpiInterceptionLayer;
+pub use unsafe_box::UnsafeBox;
 
 #[cfg(feature = "rmpi_support")]
 macro_rules! trait_layer_function {

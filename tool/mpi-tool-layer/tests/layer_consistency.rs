@@ -1,4 +1,4 @@
-use self::rmpi::{BufferRef, BufferRefKind, Process, RmpiResult, Tag};
+use self::rmpi::{BufferRef, BufferRefKind, Process, RmpiContext, RmpiResult, Tag};
 use mpi_sys::*;
 use mpi_tool_layer::{MpiInterceptionLayer, RawMpiInterceptionLayer, UnsafeBox};
 use rmpi::pmpi_mode as rmpi;
@@ -8,9 +8,15 @@ use std::os::raw::*;
 fn mpi_send() {
     enum EmptyLayer {}
     impl MpiInterceptionLayer for EmptyLayer {
-        fn send<F, Buf>(next_f: F, buf: Buf, dest: Process, tag: Tag) -> RmpiResult
+        fn send<F, Buf>(
+            next_f: F,
+            rmpi_context: &RmpiContext,
+            buf: Buf,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult
         where
-            F: FnOnce(Buf, Process, Tag) -> RmpiResult,
+            F: FnOnce(&RmpiContext, Buf, Process, Tag) -> RmpiResult,
             Buf: BufferRef,
         {
             match buf.kind_ref() {
@@ -20,7 +26,7 @@ fn mpi_send() {
             assert_eq!(dest.rank(), 1);
             assert_eq!(dest.communicator().as_raw(), MPI_COMM_WORLD);
             assert_eq!(tag, 7);
-            let res = next_f(buf, dest, tag);
+            let res = next_f(rmpi_context, buf, dest, tag);
             res
         }
     }

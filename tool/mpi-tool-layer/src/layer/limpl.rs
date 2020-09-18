@@ -9,7 +9,7 @@ use rmpi::pmpi_mode as rmpi;
 use self::rmpi::{
     datatype::{MpiPredefinedDatatype, RawDatatype},
     request::{Request, RequestSlice},
-    Buffer, BufferMut, BufferRef, CStrMutPtr, Communicator, Group, Process, Status,
+    Buffer, BufferMut, BufferRef, CStrMutPtr, Communicator, Group, Process, RmpiContext, Status,
     TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 use mpi_sys::pmpi::*;
@@ -59,9 +59,10 @@ where
         }
         #[inline]
         fn finalize(next_f: UnsafeBox) -> c_int {
-            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::finalize(|| {
-                rmpi::Error::from_mpi_res(unsafe { next_f.unwrap() }())
-            }))
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::finalize(
+                |rmpi_ctx| unsafe { rmpi_ctx.finalize_with(next_f.unwrap()) },
+                unsafe { RmpiContext::create_unchecked() },
+            ))
         }
         #[inline]
         fn finalized(next_f: UnsafeBox, flag: *mut c_int) -> c_int {
@@ -75,17 +76,24 @@ where
 
         #[inline]
         fn wtime(next_f: UnsafeBox) -> c_double {
-            <Self as MpiInterceptionLayer>::wtime(unsafe { next_f.unwrap() })
+            <Self as MpiInterceptionLayer>::wtime(
+                |_rmpi_ctx| unsafe { (next_f.unwrap())() },
+                unsafe { RmpiContext::create_unchecked_ref() },
+            )
         }
         #[inline]
         fn wtick(next_f: UnsafeBox) -> c_double {
-            <Self as MpiInterceptionLayer>::wtick(unsafe { next_f.unwrap() })
+            <Self as MpiInterceptionLayer>::wtick(
+                |_rmpi_ctx| unsafe { (next_f.unwrap())() },
+                unsafe { RmpiContext::create_unchecked_ref() },
+            )
         }
 
         #[inline]
         fn barrier(next_f: UnsafeBox, comm: MPI_Comm) -> c_int {
             rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::barrier(
-                |comm| unsafe { comm.barrier_with(next_f.unwrap()) },
+                |_rmpi_ctx, comm| unsafe { comm.barrier_with(next_f.unwrap()) },
+                unsafe { RmpiContext::create_unchecked_ref() },
                 unsafe { Communicator::from_raw_ref(&comm) },
             ))
         }
@@ -100,7 +108,8 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::group_incl(
-                    |group, ranks| unsafe { group.incl_with(next_f.unwrap(), ranks) },
+                    |_rmpi_ctx, group, ranks| unsafe { group.incl_with(next_f.unwrap(), ranks) },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe { Group::from_raw_ref(&group) },
                     unsafe { slice::from_raw_parts(ranks, n as usize) },
                 )
@@ -112,7 +121,8 @@ where
         #[inline]
         fn group_free(next_f: UnsafeBox, group: *mut MPI_Group) -> c_int {
             rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::group_free(
-                |group| unsafe { group.free_with(next_f.unwrap()) },
+                |_rmpi_ctx, group| unsafe { group.free_with(next_f.unwrap()) },
+                unsafe { RmpiContext::create_unchecked_ref() },
                 unsafe { Group::from_raw(*group) },
             ))
         }
@@ -121,7 +131,8 @@ where
         fn comm_size(next_f: UnsafeBox, comm: MPI_Comm, size: *mut c_int) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::comm_size(
-                    |comm| unsafe { comm.size_with(next_f.unwrap()) },
+                    |_rmpi_ctx, comm| unsafe { comm.size_with(next_f.unwrap()) },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe { Communicator::from_raw_ref(&comm) },
                 )
                 .map(|size_out| {
@@ -133,7 +144,8 @@ where
         fn comm_rank(next_f: UnsafeBox, comm: MPI_Comm, rank: *mut c_int) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::comm_rank(
-                    |comm| unsafe { comm.current_rank_with(next_f.unwrap()) },
+                    |_rmpi_ctx, comm| unsafe { comm.current_rank_with(next_f.unwrap()) },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe { Communicator::from_raw_ref(&comm) },
                 )
                 .map(|rank_out| {
@@ -150,7 +162,10 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::comm_create(
-                    |comm, group| unsafe { comm.create_subset_with(next_f.unwrap(), group) },
+                    |_rmpi_ctx, comm, group| unsafe {
+                        comm.create_subset_with(next_f.unwrap(), group)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe { Communicator::from_raw_ref(&comm) },
                     unsafe { Group::from_raw_ref(&group) },
                 )
@@ -162,7 +177,8 @@ where
         #[inline]
         fn comm_free(next_f: UnsafeBox, comm: *mut MPI_Comm) -> c_int {
             rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::comm_free(
-                |comm| unsafe { comm.free_with(next_f.unwrap()) },
+                |_rmpi_ctx, comm| unsafe { comm.free_with(next_f.unwrap()) },
+                unsafe { RmpiContext::create_unchecked_ref() },
                 unsafe { Communicator::from_raw(*comm) },
             ))
         }
@@ -181,12 +197,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::send(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.send_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         )
                     )
                 }
@@ -206,12 +223,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::bsend(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.bsend_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         )
                     )
                 }
@@ -231,12 +249,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::ssend(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.ssend_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         )
                     )
                 }
@@ -256,12 +275,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::rsend(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.rsend_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         )
                     )
                 }
@@ -283,12 +303,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::isend(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.isend_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         ).map(|rq|{
                             unsafe{request.write(rq.into_raw())};
                             ()
@@ -312,12 +333,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::ibsend(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.ibsend_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         ).map(|rq|{
                             unsafe{request.write(rq.into_raw())};
                             ()
@@ -341,12 +363,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::issend(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.issend_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         ).map(|rq|{
                             unsafe{request.write(rq.into_raw())};
                             ()
@@ -370,12 +393,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::irsend(
-                            |buf, dest, tag| {
+                            |_rmpi_ctx,buf, dest, tag| {
                                 unsafe{dest.irsend_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into()
+                            tag.into(),
                         ).map(|rq|{
                             unsafe{request.write(rq.into_raw())};
                             ()
@@ -400,13 +424,14 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::recv(
-                            |buf, dest, tag, status_ignore| {
+                            |_rmpi_ctx,buf, dest, tag, status_ignore| {
                                 unsafe{dest.recv_with(next_f.unwrap(), buf, tag, status_ignore)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
                             tag.into(),
-                            (status as *const MPI_Status) == MPI_STATUS_IGNORE
+                            (status as *const MPI_Status) == MPI_STATUS_IGNORE,
                         ).map(|opt_status_ret|{
                             if let Some(status_ret) = opt_status_ret {
                                 unsafe{status.write(status_ret.into_raw())};
@@ -432,12 +457,13 @@ where
                 (buf,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::irecv(
-                            |buf, source, tag| {
+                            |_rmpi_ctx,buf, source, tag| {
                                 unsafe{source.irecv_with(next_f.unwrap(), buf, tag)}
                             },
+                            unsafe { RmpiContext::create_unchecked_ref() },
                             buffer,
                             unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
-                            tag.into()
+                            tag.into(),
                         ).map(|rq|{
                             unsafe{request.write(rq.into_raw())};
                             ()
@@ -469,7 +495,7 @@ where
                         (recvbuf,recvcount,recvtype) => recv_buffer => {
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::sendrecv(
-                                    |sendbuf, dest, sendtag,
+                                    |_rmpi_ctx, sendbuf, dest, sendtag,
                                      recvbuf, src, recvtag,
                                      status_ignore| {
                                         unsafe {
@@ -480,13 +506,14 @@ where
                                             )
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer,
                                     unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
                                     sendtag.into(),
                                     recv_buffer,
                                     unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
                                     recvtag.into(),
-                                    status == MPI_STATUS_IGNORE
+                                    status == MPI_STATUS_IGNORE,
                                 ).map(|opt_status_ret|{
                                     if let Some(status_ret) = opt_status_ret {
                                         unsafe{status.write(status_ret.into_raw())};
@@ -508,7 +535,10 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::get_count(
-                    |status, datatype| unsafe { status.get_count_with(next_f.unwrap(), datatype) },
+                    |_rmpi_ctx, status, datatype| unsafe {
+                        status.get_count_with(next_f.unwrap(), datatype)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe { &Status::from_raw(*status) },
                     &unsafe { RawDatatype::from_raw(datatype) },
                 )
@@ -524,10 +554,11 @@ where
             let buffer = buffer as *mut *mut u8;
             rmpi::Error::result_into_mpi_res(unsafe {
                 <Self as MpiInterceptionLayer>::buffer_attach(
-                    |mut buffer| {
+                    |_rmpi_ctx, mut buffer| {
                         let (ptr, len) = buffer.as_raw_mut();
                         rmpi::Error::from_mpi_res(next_f.unwrap()(ptr, len))
                     },
+                    RmpiContext::create_unchecked_ref(),
                     slice::from_raw_parts_mut(*buffer, size as usize),
                 )
             })
@@ -536,18 +567,21 @@ where
         fn buffer_detach(next_f: UnsafeBox, buffer: *mut c_void, size: *mut c_int) -> c_int {
             let buffer = buffer as *mut *mut u8;
             rmpi::Error::result_into_mpi_res(unsafe {
-                <Self as MpiInterceptionLayer>::buffer_detach(|| {
-                    let buffer = &mut ptr::null_mut();
-                    let size = &mut 0;
-                    rmpi::Error::from_mpi_res(next_f.unwrap()(
-                        buffer as *mut *mut _ as *mut _,
-                        size,
-                    ))
-                    .map(|()| {
-                        let buffer = buffer as *mut *mut u8;
-                        slice::from_raw_parts_mut(*buffer, *size as usize)
-                    })
-                })
+                <Self as MpiInterceptionLayer>::buffer_detach(
+                    |_rmpi_ctx| {
+                        let buffer = &mut ptr::null_mut();
+                        let size = &mut 0;
+                        rmpi::Error::from_mpi_res(next_f.unwrap()(
+                            buffer as *mut *mut _ as *mut _,
+                            size,
+                        ))
+                        .map(|()| {
+                            let buffer = buffer as *mut *mut u8;
+                            slice::from_raw_parts_mut(*buffer, *size as usize)
+                        })
+                    },
+                    RmpiContext::create_unchecked_ref(),
+                )
                 .map(|buf| {
                     buffer.write(buf.as_mut_ptr());
                     size.write(buf.len() as c_int);
@@ -559,9 +593,10 @@ where
         fn wait(next_f: UnsafeBox, request: *mut MPI_Request, status: *mut MPI_Status) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::wait(
-                    |request, status_ignore| unsafe {
+                    |_rmpi_ctx, request, status_ignore| unsafe {
                         request.wait_with(next_f.unwrap(), status_ignore)
                     },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe { Request::from_raw(*request) },
                     status == MPI_STATUS_IGNORE,
                 )
@@ -587,9 +622,10 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::waitany(
-                    |req_slc, status_ignore| unsafe {
+                    |_rmpi_ctx, req_slc, status_ignore| unsafe {
                         req_slc.waitany_with(next_f.unwrap(), status_ignore)
                     },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe {
                         RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
                             array_of_requests,
@@ -615,9 +651,10 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::waitall(
-                    |req_slc, status_slc| unsafe {
+                    |_rmpi_ctx, req_slc, status_slc| unsafe {
                         req_slc.waitall_with(next_f.unwrap(), status_slc)
                     },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe {
                         RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
                             array_of_requests,
@@ -653,9 +690,10 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::test(
-                    |request, status_ignore| unsafe {
+                    |_rmpi_ctx, request, status_ignore| unsafe {
                         request.test_with(next_f.unwrap(), status_ignore)
                     },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe { Request::from_raw(*request) },
                     status == MPI_STATUS_IGNORE,
                 )
@@ -689,9 +727,10 @@ where
         ) -> c_int {
             rmpi::Error::result_into_mpi_res(
                 <Self as MpiInterceptionLayer>::testany(
-                    |req_slc, status_ignore| unsafe {
+                    |_rmpi_ctx, req_slc, status_ignore| unsafe {
                         req_slc.testany_with(next_f.unwrap(), status_ignore)
                     },
+                    unsafe { RmpiContext::create_unchecked_ref() },
                     unsafe {
                         RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
                             array_of_requests,
@@ -716,14 +755,16 @@ where
         #[inline]
         fn request_free(next_f: UnsafeBox, request: *mut MPI_Request) -> c_int {
             rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::request_free(
-                |request| unsafe { request.free_with(next_f.unwrap()) },
+                |_rmpi_ctx, request| unsafe { request.free_with(next_f.unwrap()) },
+                unsafe { RmpiContext::create_unchecked_ref() },
                 unsafe { Request::from_raw(*request) },
             ))
         }
         #[inline]
         fn cancel(next_f: UnsafeBox, request: *mut MPI_Request) -> c_int {
             rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::cancel(
-                |request| unsafe { request.cancel_with(next_f.unwrap()) },
+                |_rmpi_ctx, request| unsafe { request.cancel_with(next_f.unwrap()) },
+                unsafe { RmpiContext::create_unchecked_ref() },
                 unsafe { Request::from_raw(*request) },
             ))
         }
@@ -741,10 +782,11 @@ where
                 (buffer,count,datatype) => buffer => {
                     rmpi::Error::result_into_mpi_res(
                         <Self as MpiInterceptionLayer>::bcast(
-                            |buf, root| {
+                            |_rmpi_ctx,buf, root| {
                                 unsafe{root.bcast_with(next_f.unwrap(), buf)}
                             },
-                            buffer, unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                            unsafe { RmpiContext::create_unchecked_ref() },
+                            buffer, unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
                         )
                     )
                 }
@@ -769,13 +811,14 @@ where
                         (recvbuf, recvcount, recvtype) => recv_buffer => {
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::gather(
-                                    |send_buffer, recv_buffer, root| {
+                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
                                         unsafe {
                                             root.gather_with(next_f.unwrap(), send_buffer, recv_buffer)
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
                                 )
                             )
                         }
@@ -820,13 +863,14 @@ where
                             }
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::gatherv(
-                                    |send_buffer, recv_buffer, root| {
+                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
                                         unsafe {
                                             root.gatherv_with(next_f.unwrap(), send_buffer, recv_buffer)
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer, &mut recv_buffers,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
                                 )
                             )
                         }
@@ -853,13 +897,14 @@ where
                                     };
                                 }
                                 <Self as MpiInterceptionLayer>::gatherv(
-                                    |send_buffer, recv_buffer, root| {
+                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
                                         unsafe {
                                             root.gatherv_with(next_f.unwrap(), send_buffer, recv_buffer)
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer, &mut recv_buffers,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
                                 )
                             })())
                         }
@@ -885,13 +930,14 @@ where
                         (recvbuf, recvcount, recvtype) => recv_buffer => {
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::allgather(
-                                    |send_buffer, recv_buffer, communicator| {
+                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| {
                                         unsafe {
                                             communicator.allgather_with(next_f.unwrap(), send_buffer, recv_buffer)
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}
+                                    unsafe{Communicator::from_raw_ref(&comm)},
                                 )
                             )
                         }
@@ -932,15 +978,16 @@ where
                             };
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::allgatherv(
-                                    |send_buffer, recv_buffer, communicator| {
+                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| {
                                         unsafe {
                                             communicator.allgatherv_with(
                                                 next_f.unwrap(), send_buffer, recv_buffer
                                             )
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer, &mut recv_buffers,
-                                    unsafe{Communicator::from_raw_ref(&comm)}
+                                    unsafe{Communicator::from_raw_ref(&comm)},
                                 )
                             )
                         }
@@ -966,13 +1013,14 @@ where
                         (recvbuf, recvcount, recvtype) => recv_buffer => {
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::alltoall(
-                                    |send_buffer, recv_buffer, communicator| {
+                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| {
                                         unsafe {
                                             communicator.alltoall_with(next_f.unwrap(), send_buffer, recv_buffer)
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}
+                                    unsafe{Communicator::from_raw_ref(&comm)},
                                 )
                             )
                         }
@@ -1029,11 +1077,12 @@ where
                             }
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::alltoallv(
-                                    |send_buffer, recv_buffer, communicator| unsafe {
+                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| unsafe {
                                         communicator.alltoallv_with(
                                             next_f.unwrap(), send_buffer, recv_buffer
                                         )
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     &send_buffers,
                                     &mut recv_buffers,
                                     unsafe { Communicator::from_raw_ref(&comm) },
@@ -1062,9 +1111,10 @@ where
                     let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
                     let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::reduce(
-                        |send_buffer, recv_buffer, op, root| unsafe {
+                        |_rmpi_ctx, send_buffer, recv_buffer, op, root| unsafe {
                             root.reduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
                         },
+                        unsafe { RmpiContext::create_unchecked_ref() },
                         send_buffer,
                         recv_buffer,
                         op.into(),
@@ -1081,9 +1131,10 @@ where
                         )
                     };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::reduce(
-                        |send_buffer, recv_buffer, op, root| unsafe {
+                        |_rmpi_ctx, send_buffer, recv_buffer, op, root| unsafe {
                             root.reduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
                         },
+                        unsafe { RmpiContext::create_unchecked_ref() },
                         send_buffer,
                         recv_buffer,
                         op.into(),
@@ -1108,9 +1159,10 @@ where
                     let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
                     let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
-                        |send_buffer, recv_buffer, op, communicator| unsafe {
+                        |_rmpi_ctx, send_buffer, recv_buffer, op, communicator| unsafe {
                             communicator.allreduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
                         },
+                        unsafe { RmpiContext::create_unchecked_ref() },
                         send_buffer,
                         recv_buffer,
                         op.into(),
@@ -1125,9 +1177,10 @@ where
                         TypeDynamicBufferMut::from_raw_dynamic(recvbuf, count, datatype)
                     };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
-                        |send_buffer, recv_buffer, op, communicator| unsafe {
+                        |_rmpi_ctx, send_buffer, recv_buffer, op, communicator| unsafe {
                             communicator.allreduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
                         },
+                        unsafe { RmpiContext::create_unchecked_ref() },
                         send_buffer,
                         recv_buffer,
                         op.into(),
@@ -1153,9 +1206,10 @@ where
                     let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
                     let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scan(
-                        |send_buffer, recv_buffer, op, communicator| unsafe {
+                        |_rmpi_ctx,send_buffer, recv_buffer, op, communicator| unsafe {
                             communicator.scan_with(next_f.unwrap(), send_buffer, recv_buffer, op)
                         },
+                        unsafe { RmpiContext::create_unchecked_ref() },
                         send_buffer,
                         recv_buffer,
                         op.into(),
@@ -1174,9 +1228,10 @@ where
                         )
                     };
                     rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scan(
-                        |send_buffer, recv_buffer, op, communicator| unsafe {
+                        |_rmpi_ctx,send_buffer, recv_buffer, op, communicator| unsafe {
                             communicator.scan_with(next_f.unwrap(), send_buffer, recv_buffer, op)
                         },
+                        unsafe { RmpiContext::create_unchecked_ref() },
                         send_buffer,
                         recv_buffer,
                         op.into(),
@@ -1204,13 +1259,14 @@ where
                         (recvbuf, recvcount, recvtype) => recv_buffer => {
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::scatter(
-                                    |send_buffer, recv_buffer, root| {
+                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
                                         unsafe {
                                             root.scatter_with(next_f.unwrap(), send_buffer, recv_buffer)
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
                                 )
                             )
                         }
@@ -1255,13 +1311,14 @@ where
                             }
                             rmpi::Error::result_into_mpi_res(
                                 <Self as MpiInterceptionLayer>::scatterv(
-                                    |send_buffer, recv_buffer, root| {
+                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
                                         unsafe {
                                             root.scatterv_with(next_f.unwrap(), send_buffer, recv_buffer)
                                         }
                                     },
+                                    unsafe { RmpiContext::create_unchecked_ref() },
                                     &send_buffers, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
                                 )
                             )
                         }
@@ -1291,7 +1348,7 @@ where
                                         };
                                     }
                                     <Self as MpiInterceptionLayer>::scatterv(
-                                        |send_buffer, recv_buffer, root| {
+                                        |_rmpi_ctx,send_buffer, recv_buffer, root| {
                                             unsafe {
                                                 root.scatterv_with(
                                                     next_f.unwrap(),
@@ -1300,8 +1357,9 @@ where
                                                 )
                                             }
                                         },
+                                        unsafe { RmpiContext::create_unchecked_ref() },
                                         &send_buffers, recv_buffer,
-                                        unsafe{Communicator::from_raw_ref(&comm)}.get_process(root)
+                                        unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
                                     )
                                 })()
                             )
