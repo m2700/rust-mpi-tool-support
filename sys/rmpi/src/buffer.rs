@@ -313,6 +313,88 @@ impl<'b> BufferMut for TypeDynamicBufferMut<'b> {
     }
 }
 
+impl<'a, B> BufferRef for &'a B
+where
+    B: BufferRef,
+{
+    type Mut = &'a mut B::Mut;
+
+    #[inline]
+    fn item_datatype(&self) -> MPI_Datatype {
+        (**self).item_datatype()
+    }
+    #[inline]
+    fn as_raw(&self) -> (*const c_void, c_int) {
+        (**self).as_raw()
+    }
+    #[inline]
+    fn as_ptr(&self) -> *const () {
+        (**self).as_ptr()
+    }
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        (**self).as_bytes()
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        (**self).len()
+    }
+    #[inline]
+    fn kind_ref(&self) -> BufferRefKind {
+        (**self).kind_ref()
+    }
+}
+impl<'a, B> BufferRef for &'a mut B
+where
+    B: BufferRef,
+{
+    type Mut = &'a mut B::Mut;
+
+    #[inline]
+    fn item_datatype(&self) -> MPI_Datatype {
+        (**self).item_datatype()
+    }
+    #[inline]
+    fn as_raw(&self) -> (*const c_void, c_int) {
+        (**self).as_raw()
+    }
+    #[inline]
+    fn as_ptr(&self) -> *const () {
+        (**self).as_ptr()
+    }
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        (**self).as_bytes()
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        (**self).len()
+    }
+    #[inline]
+    fn kind_ref(&self) -> BufferRefKind {
+        (**self).kind_ref()
+    }
+}
+impl<'a, B> BufferMut for &'a mut B
+where
+    B: BufferMut,
+{
+    type Ref = &'a B::Ref;
+
+    #[inline]
+    fn as_raw_mut(&mut self) -> (*mut c_void, c_int) {
+        (**self).as_raw_mut()
+    }
+    #[inline]
+    fn as_mut_ptr(&mut self) -> *mut () {
+        (**self).as_mut_ptr()
+    }
+    #[inline]
+    fn kind_mut(&mut self) -> BufferMutKind {
+        (**self).kind_mut()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum BufferRefKind<'a> {
     U8(&'a [u8]),
