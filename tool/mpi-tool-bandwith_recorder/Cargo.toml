@@ -1,0 +1,17 @@
+[package]
+name = "mpi-tool-bandwith_recorder"
+version = "0.1.0"
+authors = ["Matthias Kübrich <matthias.kuebrich@tum.de>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+qmpi-tool-creator = { path = "../qmpi-tool-creator" }
+# qmpi-tool-creator = { path = "../qmpi-tool-creator" }
+mpi-tool-layer = { path = "../mpi-tool-layer", features = ["rmpi_support"] }
+mpi_func-id = { path = "../../sys/mpi_func-id" }
+rmpi = { path = "../../sys/rmpi" }
