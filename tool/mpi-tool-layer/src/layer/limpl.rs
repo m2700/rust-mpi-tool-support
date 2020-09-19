@@ -500,9 +500,9 @@ where
                     unsafe { &Status::from_raw(*status) },
                     &unsafe { RawDatatype::from_raw(datatype) },
                 )
-                .map(|cnt| {
-                    unsafe { count.write(cnt) };
-                    ()
+                .map(|cnt| match cnt {
+                    Some(cnt) => unsafe { count.write(cnt) },
+                    None => unsafe { count.write(MPI_UNDEFINED) },
                 }),
             )
         }
@@ -630,11 +630,13 @@ where
                         }
                     },
                 )
-                .map(|out_statuses| {
-                    debug_assert_eq!(
-                        out_statuses.as_mut_ptr() as *mut MPI_Status,
-                        array_of_statuses
-                    );
+                .map(|opt_out_statuses| {
+                    if let Some(out_statuses) = opt_out_statuses {
+                        debug_assert_eq!(
+                            out_statuses.as_mut_ptr() as *mut MPI_Status,
+                            array_of_statuses
+                        );
+                    }
                 }),
             )
         }
@@ -706,6 +708,48 @@ where
                         }
                     },
                     None => unsafe { *flag = 0 },
+                }),
+            )
+        }
+        #[inline]
+        fn testall(
+            next_f: UnsafeBox,
+            count: c_int,
+            array_of_requests: *mut MPI_Request,
+            flag: *mut c_int,
+            array_of_statuses: *mut MPI_Status,
+        ) -> c_int {
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::testall(
+                    |_rmpi_ctx, req_slc, status_slc| unsafe {
+                        req_slc.testall_with(next_f.unwrap(), status_slc)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    unsafe {
+                        RequestSlice::from_raw_mut(slice::from_raw_parts_mut(
+                            array_of_requests,
+                            count as usize,
+                        ))
+                    },
+                    if array_of_statuses as *mut MPI_Status == MPI_STATUSES_IGNORE {
+                        &mut []
+                    } else {
+                        unsafe {
+                            Status::from_raw_slice_mut_maybe_uninit(
+                                array_of_statuses,
+                                count as usize,
+                            )
+                        }
+                    },
+                )
+                .map(|opt_out_statuses| {
+                    unsafe { *flag = opt_out_statuses.is_some() as c_int };
+                    if let Some(out_statuses) = opt_out_statuses {
+                        debug_assert_eq!(
+                            out_statuses.as_mut_ptr() as *mut MPI_Status,
+                            array_of_statuses
+                        );
+                    }
                 }),
             )
         }

@@ -302,7 +302,7 @@ impl<'b> RequestSlice<'b> {
             &mut self,
             mpi_waitall: F,
             statuses: &'st mut [MaybeUninit<Status>],
-        ) -> RmpiResult<&'st mut [Status]>
+        ) -> RmpiResult<Option<&'st mut [Status]>>
         where
             F: FnOnce(c_int, *mut MPI_Request, *mut MPI_Status) -> c_int,
         {
@@ -317,18 +317,75 @@ impl<'b> RequestSlice<'b> {
                 self.1.as_mut_ptr(),
                 raw_statuses,
             ))
-            .map(|()| transmute::<&mut [MaybeUninit<Status>], &mut [Status]>(statuses))
+            .map(|()| {
+                if statuses.is_empty() {
+                    Some(transmute::<&mut [MaybeUninit<Status>], &mut [Status]>(
+                        statuses,
+                    ))
+                } else {
+                    None
+                }
+            })
         }
     );
     #[inline]
     pub fn waitall<'st>(
         &mut self,
         statuses: &'st mut [MaybeUninit<Status>],
-    ) -> RmpiResult<&'st mut [Status]> {
+    ) -> RmpiResult<Option<&'st mut [Status]>> {
         unsafe {
             self.waitall_with(
                 |count, array_of_requests, array_of_statuses| {
                     MPI_Waitall(count, array_of_requests, array_of_statuses)
+                },
+                statuses,
+            )
+        }
+    }
+
+    tool_mode_item!(
+        #[inline]
+        pub unsafe fn testall_with<'st, F>(
+            &mut self,
+            mpi_testall: F,
+            statuses: &'st mut [MaybeUninit<Status>],
+        ) -> RmpiResult<Option<&'st mut [Status]>>
+        where
+            F: FnOnce(c_int, *mut MPI_Request, *mut c_int, *mut MPI_Status) -> c_int,
+        {
+            let raw_statuses = if statuses.is_empty() {
+                MPI_STATUSES_IGNORE
+            } else {
+                debug_assert_eq!(self.len(), statuses.len());
+                Status::as_maybe_uninit_ptr_mut(statuses)
+            };
+            let mut flag = 0;
+            Error::from_mpi_res(mpi_testall(
+                self.1.len() as c_int,
+                self.1.as_mut_ptr(),
+                &mut flag,
+                raw_statuses,
+            ))
+            .map(|()| {
+                if statuses.is_empty() {
+                    Some(transmute::<&mut [MaybeUninit<Status>], &mut [Status]>(
+                        statuses,
+                    ))
+                } else {
+                    None
+                }
+            })
+        }
+    );
+    #[inline]
+    pub fn testall<'st, F>(
+        &mut self,
+        statuses: &'st mut [MaybeUninit<Status>],
+    ) -> RmpiResult<Option<&'st mut [Status]>> {
+        unsafe {
+            self.testall_with(
+                |count, array_of_requests, flag, array_of_statuses| {
+                    MPI_Testall(count, array_of_requests, flag, array_of_statuses)
                 },
                 statuses,
             )

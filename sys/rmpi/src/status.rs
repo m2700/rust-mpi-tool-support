@@ -62,20 +62,30 @@ impl Status {
         this.as_mut_ptr() as *mut _
     }
 
-    tool_mode_item! {
+    tool_mode_item!(
         #[inline]
-        pub unsafe fn get_count_with<F>(&self, get_count: F, datatype: &RawDatatype) -> RmpiResult<c_int>
-            where
-                F: FnOnce(*const MPI_Status, MPI_Datatype, *mut c_int) -> c_int,
+        pub unsafe fn get_count_with<F>(
+            &self,
+            get_count: F,
+            datatype: &RawDatatype,
+        ) -> RmpiResult<Option<c_int>>
+        where
+            F: FnOnce(*const MPI_Status, MPI_Datatype, *mut c_int) -> c_int,
         {
             let mut count = 0;
-            Error::from_mpi_res(
-                get_count(&self.into_raw(), datatype.as_raw(), &mut count)
-            ).map(|()|count)
+            Error::from_mpi_res(get_count(&self.into_raw(), datatype.as_raw(), &mut count)).map(
+                |()| {
+                    if count == MPI_UNDEFINED {
+                        None
+                    } else {
+                        Some(count)
+                    }
+                },
+            )
         }
-    }
+    );
     #[inline]
-    pub fn get_count(&self, datatype: &RawDatatype) -> RmpiResult<c_int> {
+    pub fn get_count(&self, datatype: &RawDatatype) -> RmpiResult<Option<c_int>> {
         unsafe {
             self.get_count_with(
                 |status, datatype, count| MPI_Get_count(status, datatype, count),

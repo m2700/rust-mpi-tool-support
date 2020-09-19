@@ -143,7 +143,7 @@ pub trait MpiInterceptionLayer {
             rmpi_ctx: &RmpiContext,
             status: &Status,
             datatype: &RawDatatype,
-        ) -> RmpiResult<c_int>;
+        ) -> RmpiResult<Option<c_int>>;
 
         #[doc = "unsafe, because lifetime is unknown"]
         #[inline]
@@ -169,7 +169,7 @@ pub trait MpiInterceptionLayer {
             rmpi_ctx: &RmpiContext,
             requests: &mut RequestSlice,
             responses: &'statuses mut [MaybeUninit<Status>],
-        ) -> RmpiResult<&'statuses mut [Status]>;
+        ) -> RmpiResult<Option<&'statuses mut [Status]>>;
 
         #[inline]
         fn test<'r>(
@@ -183,6 +183,12 @@ pub trait MpiInterceptionLayer {
             request: &mut RequestSlice,
             status_ignore: bool,
         ) -> RmpiResult<Option<(usize, Option<Status>)>>;
+        #[inline]
+        fn testall<'statuses>(
+            rmpi_ctx: &RmpiContext,
+            requests: &mut RequestSlice,
+            responses: &'statuses mut [MaybeUninit<Status>],
+        ) -> RmpiResult<Option<&'statuses mut [Status]>>;
 
         #[inline]
         fn request_free(rmpi_ctx: &RmpiContext, request: Request) -> RmpiResult;

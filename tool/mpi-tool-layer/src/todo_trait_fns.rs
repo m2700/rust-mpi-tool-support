@@ -1,17 +1,4 @@
 #[inline]
-fn testall<F>(
-    next_f: UnsafeBox<F>,
-    count: c_int,
-    array_of_requests: *mut MPI_Request,
-    flag: *mut c_int,
-    array_of_statuses: *mut MPI_Status,
-) -> c_int
-where
-    F: FnOnce(c_int, *mut MPI_Request, *mut c_int, *mut MPI_Status) -> c_int,
-{
-    unsafe { next_f.unwrap()(count, array_of_requests, flag, array_of_statuses) }
-}
-#[inline]
 fn waitsome<F>(
     next_f: UnsafeBox<F>,
     incount: c_int,
@@ -540,21 +527,6 @@ where
     F: FnOnce(*mut MPI_Op) -> c_int,
 {
     unsafe { next_f.unwrap()(op) }
-}
-#[inline]
-fn allreduce<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    recvbuf: *mut c_void,
-    count: c_int,
-    datatype: MPI_Datatype,
-    op: MPI_Op,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(*const c_void, *mut c_void, c_int, MPI_Datatype, MPI_Op, MPI_Comm) -> c_int,
-{
-    unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm) }
 }
 #[inline]
 fn reduce_scatter<F>(
