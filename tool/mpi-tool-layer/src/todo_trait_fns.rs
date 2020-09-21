@@ -544,21 +544,6 @@ where
     unsafe { next_f.unwrap()(sendbuf, recvbuf, recvcounts, datatype, op, comm) }
 }
 #[inline]
-fn scan<F>(
-    next_f: UnsafeBox<F>,
-    sendbuf: *const c_void,
-    recvbuf: *mut c_void,
-    count: c_int,
-    datatype: MPI_Datatype,
-    op: MPI_Op,
-    comm: MPI_Comm,
-) -> c_int
-where
-    F: FnOnce(*const c_void, *mut c_void, c_int, MPI_Datatype, MPI_Op, MPI_Comm) -> c_int,
-{
-    unsafe { next_f.unwrap()(sendbuf, recvbuf, count, datatype, op, comm) }
-}
-#[inline]
 fn group_size<F>(next_f: UnsafeBox<F>, group: MPI_Group, size: *mut c_int) -> c_int
 where
     F: FnOnce(MPI_Group, *mut c_int) -> c_int,
