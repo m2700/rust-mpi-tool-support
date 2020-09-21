@@ -33,54 +33,56 @@ static I64_RECV_COUNT: &AtomicUsize = &COUNTERS[9];
 static FLOAT_RECV_COUNT: &AtomicUsize = &COUNTERS[10];
 static DOUBLE_RECV_COUNT: &AtomicUsize = &COUNTERS[11];
 
-macro_rules! send_data_record {
-    ($buf:expr) => {
-        match ($buf).kind_ref() {
-            BufferRefKind::U8(buf) => I8_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I8(buf) => I8_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+fn send_data_record(buf: TypeDynamicBufferRef) {
+    match buf.kind_ref() {
+        BufferRefKind::U8(buf) => I8_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I8(buf) => I8_SEND_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::U16(buf) => I16_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I16(buf) => I16_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U16(buf) => I16_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I16(buf) => I16_SEND_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::U32(buf) => I32_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I32(buf) => I32_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U32(buf) => I32_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I32(buf) => I32_SEND_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::U64(buf) => I64_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I64(buf) => I64_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U64(buf) => I64_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I64(buf) => I64_SEND_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::Float(buf) => FLOAT_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::Double(buf) => DOUBLE_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::Float(buf) => FLOAT_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::Double(buf) => DOUBLE_SEND_COUNT.fetch_add(buf.len(), Relaxed),
 
-            _ => 0, /*ignored*/
-        };
+        _ => 0, /*ignored*/
     };
 }
+fn recv_data_record(buf: TypeDynamicBufferMut) {
+    match buf.kind_ref() {
+        BufferRefKind::U8(buf) => I8_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I8(buf) => I8_RECV_COUNT.fetch_add(buf.len(), Relaxed),
 
-macro_rules! recv_data_record {
-    ($buf:expr) => {
-        match ($buf).kind_ref() {
-            BufferRefKind::U8(buf) => I8_RECV_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I8(buf) => I8_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U16(buf) => I16_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I16(buf) => I16_RECV_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::U16(buf) => I16_RECV_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I16(buf) => I16_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U32(buf) => I32_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I32(buf) => I32_RECV_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::U32(buf) => I32_RECV_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I32(buf) => I32_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U64(buf) => I64_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I64(buf) => I64_RECV_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::U64(buf) => I64_RECV_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::I64(buf) => I64_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::Float(buf) => FLOAT_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::Double(buf) => DOUBLE_RECV_COUNT.fetch_add(buf.len(), Relaxed),
 
-            BufferRefKind::Float(buf) => FLOAT_RECV_COUNT.fetch_add(buf.len(), Relaxed),
-            BufferRefKind::Double(buf) => DOUBLE_RECV_COUNT.fetch_add(buf.len(), Relaxed),
-
-            _ => 0, /*ignored*/
-        };
+        _ => 0, /*ignored*/
     };
 }
 
 struct MyQmpiLayer;
 impl MpiInterceptionLayer for MyQmpiLayer {
+    fn finalize<F>(next_f: F, rmpi_ctx: RmpiContext) -> RmpiResult
+    where
+        F: FnOnce(RmpiContext) -> RmpiResult,
+    {
+        next_f(rmpi_ctx)
+    }
+
     fn send<F>(
         next_f: F,
         rmpi_ctx: &RmpiContext,
@@ -93,7 +95,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record!(buf);
+            send_data_record(buf);
         }
         res
     }
@@ -109,7 +111,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record!(buf);
+            send_data_record(buf);
         }
         res
     }
@@ -125,7 +127,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record!(buf);
+            send_data_record(buf);
         }
         res
     }
@@ -141,7 +143,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record!(buf);
+            send_data_record(buf);
         }
         res
     }
@@ -165,7 +167,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf.as_mut(), src, tag, status_ignore);
         if res.is_ok() {
-            recv_data_record!(buf);
+            recv_data_record(buf);
         }
         res
     }
