@@ -7,7 +7,7 @@ local_mod!(
 
 use super::Communicator;
 
-impl Communicator {
+impl<'ctx> Communicator<'ctx> {
     tool_mode_item!(
         #[inline]
         pub unsafe fn scan_with<F, B>(

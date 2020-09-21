@@ -41,11 +41,11 @@ pub trait MpiInterceptionLayer {
         #[inline]
         fn comm_rank(rmpi_ctx: &RmpiContext, comm: &Communicator) -> RmpiResult<c_int>;
         #[inline]
-        fn comm_create(
+        fn comm_create<'ctx>(
             rmpi_ctx: &RmpiContext,
-            comm: &Communicator,
+            comm: &Communicator<'ctx>,
             group: &Group,
-        ) -> RmpiResult<Communicator>;
+        ) -> RmpiResult<Communicator<'ctx>>;
         #[inline]
         fn comm_free(rmpi_ctx: &RmpiContext, comm: Communicator) -> RmpiResult;
 

@@ -128,9 +128,14 @@ impl RmpiContext {
     pub unsafe fn create_unchecked_ref() -> &'static Self {
         &*NonNull::dangling().as_ptr()
     }
+
     #[inline]
-    pub fn world(&self) -> Communicator {
+    pub fn comm_world(&self) -> Communicator {
         unsafe { Communicator::from_raw(MPI_COMM_WORLD) }
+    }
+    #[inline]
+    pub fn comm_self(&self) -> Communicator {
+        unsafe { Communicator::from_raw(MPI_COMM_SELF) }
     }
 
     tool_mode_item!(

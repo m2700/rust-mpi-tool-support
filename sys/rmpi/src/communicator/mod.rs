@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     mem::{forget, transmute, MaybeUninit},
     ops::Deref,
     os::raw::c_int,
@@ -18,29 +19,37 @@ mod create_subset;
 mod scan;
 
 /// non MPI_COMM_NULL Communicator handle that frees automatically
+/// A Communicator cannot live longer than its rmpi context, defined by 'ctx.
+/// However, a Communicator can safely be shared between threads
 #[repr(transparent)]
 #[derive(PartialEq, Eq, Debug)]
-pub struct Communicator(pub(crate) MPI_Comm);
-impl Drop for Communicator {
+pub struct Communicator<'ctx> {
+    pub(crate) raw: MPI_Comm,
+    context_lifetime: PhantomData<&'ctx ()>,
+}
+impl<'ctx> Drop for Communicator<'ctx> {
     #[inline]
     fn drop(&mut self) {
-        match self.0 {
+        match self.raw {
             MPI_COMM_NULL => unreachable!(),
             MPI_COMM_WORLD | MPI_COMM_SELF => {}
             _ => unsafe { ptr::read(self).free().unwrap() },
         }
     }
 }
-impl Deref for Communicator {
+impl<'ctx> Deref for Communicator<'ctx> {
     type Target = MPI_Comm;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.raw
     }
 }
-impl Communicator {
+impl<'ctx> Communicator<'ctx> {
     #[inline]
     pub unsafe fn from_raw(raw: MPI_Comm) -> Self {
-        Self(raw)
+        Self {
+            raw,
+            context_lifetime: PhantomData,
+        }
     }
     #[inline]
     pub unsafe fn from_raw_ref(raw: &MPI_Comm) -> &Self {
@@ -48,11 +57,11 @@ impl Communicator {
     }
     #[inline]
     pub fn as_raw(&self) -> MPI_Comm {
-        self.0
+        self.raw
     }
     #[inline]
     pub fn into_raw(&self) -> MPI_Group {
-        let raw = self.0;
+        let raw = self.raw;
         forget(self);
         raw
     }

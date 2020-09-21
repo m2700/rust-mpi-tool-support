@@ -16,7 +16,7 @@ mod sendrecv;
 
 #[derive(Clone, Copy)]
 pub struct Process<'c> {
-    pub(crate) communicator: &'c Communicator,
+    pub(crate) communicator: &'c Communicator<'c>,
     pub(crate) rank: c_int,
 }
 impl<'c> Process<'c> {
