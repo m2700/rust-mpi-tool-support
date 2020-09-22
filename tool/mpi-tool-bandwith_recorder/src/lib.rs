@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+use std::{
+    env,
+    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+};
 
 use self::rmpi::{
     BufferRef, BufferRefKind, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
@@ -113,7 +116,10 @@ impl MpiInterceptionLayer for MyQmpiLayer {
 
         next_f(rmpi_ctx)?;
 
-        if current_rank == 0 {
+        let fin_dbg_cnf = env::var("FINALIZE_DEBUG_CONFIRM");
+        if current_rank == 0
+            && (fin_dbg_cnf.is_err() || fin_dbg_cnf.as_ref().map(|s| &**s) == Ok("1"))
+        {
             for counter_id in 0..COUNTERS_LEN {
                 let count = smmd_counters[counter_id];
                 if count != 0 {

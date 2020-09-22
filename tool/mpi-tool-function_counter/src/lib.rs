@@ -1,4 +1,4 @@
-use std::{convert::TryInto, sync::atomic::Ordering::Relaxed};
+use std::{convert::TryInto, env, sync::atomic::Ordering::Relaxed};
 
 use self::rmpi::{MpiOp, RmpiContext};
 use mpi_func_id::MPI_FUNCTION_COUNT;
@@ -25,30 +25,44 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
     {
         MPI_FN_COUNTER_MAP[FId::Finalize as usize].fetch_add(1, Relaxed);
 
-        let ctx = unsafe { RmpiContext::create_unchecked_ref() };
-        let comm_world = ctx.comm_world();
-
-        let mut fn_counts = [0; MPI_FUNCTION_COUNT as usize];
-        for fnid in 0..fn_counts.len() {
-            let fnid = fnid as usize;
-            fn_counts[fnid] = MPI_FN_COUNTER_MAP[fnid].load(Relaxed);
-        }
-
         let mut all_fn_counts = [0; MPI_FUNCTION_COUNT as usize];
-        comm_world
-            .allreduce(&fn_counts[..], &mut all_fn_counts[..], MpiOp::Sum)
-            .unwrap();
+        let current_rank;
+        {
+            let ctx = unsafe { RmpiContext::create_unchecked_ref() };
+            let comm_world = ctx.comm_world();
+
+            let mut fn_counts = [0; MPI_FUNCTION_COUNT as usize];
+            for fnid in 0..fn_counts.len() {
+                let fnid = fnid as usize;
+                fn_counts[fnid] = MPI_FN_COUNTER_MAP[fnid].load(Relaxed);
+            }
+
+            comm_world
+                .get_process(0)
+                .reduce(&fn_counts[..], &mut all_fn_counts[..], MpiOp::Sum)
+                .unwrap();
+            current_rank = match comm_world.current_process() {
+                Ok(prc) => prc,
+                Err(mpi_err) => return mpi_err.into(),
+            }
+            .rank();
+        }
 
         let res = unsafe { next_f.unwrap()() };
 
-        for fnid in 0u16.. {
-            let fnid: FId = match fnid.try_into() {
-                Ok(id) => id,
-                Err(()) => break,
-            };
-            let call_count = all_fn_counts[fnid as usize];
-            if call_count != 0 {
-                println!("MPI_{:?}: {}", fnid, call_count);
+        let fin_dbg_cnf = env::var("FINALIZE_DEBUG_CONFIRM");
+        if current_rank == 0
+            && (fin_dbg_cnf.is_err() || fin_dbg_cnf.as_ref().map(|s| &**s) == Ok("1"))
+        {
+            for fnid in 0u16.. {
+                let fnid: FId = match fnid.try_into() {
+                    Ok(id) => id,
+                    Err(()) => break,
+                };
+                let call_count = all_fn_counts[fnid as usize];
+                if call_count != 0 {
+                    println!("MPI_{:?}: {}", fnid, call_count);
+                }
             }
         }
         res

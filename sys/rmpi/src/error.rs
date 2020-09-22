@@ -6,6 +6,12 @@ local_mod!(
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Error(c_int);
+impl From<Error> for c_int {
+    #[inline]
+    fn from(e: Error) -> Self {
+        e.0
+    }
+}
 impl Error {
     #[inline]
     pub fn from_mpi_res(mpi_res: c_int) -> Result<(), Self> {
