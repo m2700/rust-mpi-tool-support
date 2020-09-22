@@ -26,7 +26,7 @@ impl RawMpiInterceptionLayer for MyQmpiLayer {
         MPI_FN_COUNTER_MAP[FId::Finalize as usize].fetch_add(1, Relaxed);
 
         let ctx = unsafe { RmpiContext::create_unchecked_ref() };
-        let comm_world = ctx.world();
+        let comm_world = ctx.comm_world();
 
         let mut fn_counts = [0; MPI_FUNCTION_COUNT as usize];
         for fnid in 0..fn_counts.len() {

@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
 use self::rmpi::{
-    BufferRef, BufferRefKind, Process, RmpiContext, RmpiResult, Status, Tag, TypeDynamicBufferMut,
-    TypeDynamicBufferRef,
+    BufferRef, BufferRefKind, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
+    TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 use mpi_tool_layer::MpiInterceptionLayer;
 use qmpi_tool_creator::install_qmpi_layer as install_mpi_layer;
@@ -15,7 +15,8 @@ pub mod tool {
 
 const ATC0: AtomicUsize = AtomicUsize::new(0);
 
-static COUNTERS: [AtomicUsize; 12] = [
+const COUNTERS_LEN: usize = 12;
+static COUNTERS: [AtomicUsize; COUNTERS_LEN] = [
     ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0,
 ];
 
@@ -32,6 +33,21 @@ static I32_RECV_COUNT: &AtomicUsize = &COUNTERS[8];
 static I64_RECV_COUNT: &AtomicUsize = &COUNTERS[9];
 static FLOAT_RECV_COUNT: &AtomicUsize = &COUNTERS[10];
 static DOUBLE_RECV_COUNT: &AtomicUsize = &COUNTERS[11];
+
+const COUNTER_NAMES: [&str; COUNTERS_LEN] = [
+    "8-bit Intergers sent ",
+    "16-bit Intergers sent",
+    "32-bit Intergers sent",
+    "64-bit Intergers sent",
+    "Floats sent          ",
+    "Doubles sent         ",
+    "8-bit Intergers received ",
+    "16-bit Intergers received",
+    "32-bit Intergers received",
+    "64-bit Intergers received",
+    "Floats received          ",
+    "Doubles received         ",
+];
 
 fn send_data_record(buf: TypeDynamicBufferRef) {
     match buf.kind_ref() {
@@ -80,7 +96,29 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     where
         F: FnOnce(RmpiContext) -> RmpiResult,
     {
-        next_f(rmpi_ctx)
+        let comm_world = rmpi_ctx.comm_world();
+
+        let mut counters = [0; COUNTERS_LEN];
+        for cnt_idx in 0..counters.len() {
+            counters[cnt_idx] = COUNTERS[cnt_idx].load(Relaxed);
+        }
+
+        let mut smmd_counters = [0; COUNTERS_LEN];
+        comm_world
+            .allreduce(&counters[..], &mut smmd_counters[..], MpiOp::Sum)
+            .unwrap();
+        drop(comm_world);
+
+        next_f(rmpi_ctx)?;
+
+        for counter_id in 0..COUNTERS_LEN {
+            let count = smmd_counters[counter_id];
+            if count != 0 {
+                println!("{}: {}", COUNTER_NAMES[counter_id], count);
+            }
+        }
+
+        Ok(())
     }
 
     fn send<F>(
@@ -171,170 +209,4 @@ impl MpiInterceptionLayer for MyQmpiLayer {
         }
         res
     }
-
-    // #[inline]
-    // fn sendrecv<SendBuf, RecvBuf>(
-    //     sendbuf: SendBuf,
-    //     dest: Process,
-    //     sendtag: Tag,
-    //     recvbuf: RecvBuf,
-    //     src: Process,
-    //     recvtag: Tag,
-    //     status_ignore: bool,
-    // ) -> RmpiResult<Option<Status>>
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-
-    // #[inline]
-    // fn bcast<Buf>(buf: Buf, root: Process) -> RmpiResult
-    // where
-    //     Buf: BufferMut;
-
-    // #[inline]
-    // fn get_count(status: &Status, datatype: &RawDatatype) -> RmpiResult<c_int>;
-
-    // #[doc = "unsafe, because lifetime is unknown"]
-    // #[inline]
-    // unsafe fn buffer_attach(buffer: &'static mut [u8]) -> RmpiResult;
-    // #[doc = "unsafe, because lifetime is unknown"]
-    // #[inline]
-    // unsafe fn buffer_detach() -> RmpiResult<&'static mut [u8]>;
-
-    // #[inline]
-    // fn wait(
-    //     request: Request,
-    //     status_ignore: bool,
-    // ) -> RmpiResult<(Option<Status>, Option<Request>)>;
-    // #[inline]
-    // fn waitany(
-    //     requests: &mut RequestSlice,
-    //     status_ignore: bool,
-    // ) -> RmpiResult<(usize, Option<Status>)>;
-    // #[inline]
-    // fn waitall<'statuses>(
-    //     requests: &mut RequestSlice,
-    //     responses: &'statuses mut [MaybeUninit<Status>],
-    // ) -> RmpiResult<&'statuses mut [Status]>;
-
-    // #[inline]
-    // fn test(
-    //     request: Request,
-    //     status_ignore: bool,
-    // ) -> RmpiResult<Result<(Option<Status>, Option<Request>), Request>>;
-    // #[inline]
-    // fn testany(
-    //     request: &mut RequestSlice,
-    //     status_ignore: bool,
-    // ) -> RmpiResult<Option<(usize, Option<Status>)>>;
-
-    // #[inline]
-    // fn request_free(request: Request) -> RmpiResult;
-    // #[inline]
-    // fn cancel(request: Request) -> RmpiResult;
-
-    // // should I really use Buffers of different datatypes??
-    // #[inline]
-    // fn gather<SendBuf, RecvBuf>(
-    //     sendbuf: SendBuf,
-    //     recvbuf: RecvBuf,
-    //     root: Process,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-    // #[inline]
-    // fn gatherv<SendBuf, RecvBuf>(
-    //     sendbuf: SendBuf,
-    //     recvbufs: &mut [RecvBuf],
-    //     root: Process,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-    // #[inline]
-    // fn allgather<SendBuf, RecvBuf>(
-    //     sendbuf: SendBuf,
-    //     recvbuf: RecvBuf,
-    //     comm: &Communicator,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-    // #[inline]
-    // fn allgatherv<SendBuf, RecvBuf>(
-    //     sendbuf: SendBuf,
-    //     recvbufs: &mut [RecvBuf],
-    //     comm: &Communicator,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-
-    // #[inline]
-    // fn alltoall<SendBuf, RecvBuf>(
-    //     sendbuf: SendBuf,
-    //     recvbuf: RecvBuf,
-    //     comm: &Communicator,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-    // #[inline]
-    // fn alltoallv<SendBuf, RecvBuf>(
-    //     sendbufs: &[SendBuf],
-    //     recvbufs: &mut [RecvBuf],
-    //     comm: &Communicator,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-
-    // #[inline]
-    // fn reduce<Buf>(
-    //     sendbuf: Buf,
-    //     recvbuf: Buf::Mut,
-    //     op: MpiOp,
-    //     root: Process,
-    // ) -> RmpiResult
-    // where
-    //     Buf: BufferRef;
-    // #[inline]
-    // fn allreduce<Buf>(
-    //     sendbuf: Buf,
-    //     recvbuf: Buf::Mut,
-    //     op: MpiOp,
-    //     comm: &Communicator,
-    // ) -> RmpiResult
-    // where
-    //     Buf: BufferRef;
-
-    // #[inline]
-    // fn scan<Buf>(
-    //     sendbuf: Buf,
-    //     recvbuf: Buf::Mut,
-    //     op: MpiOp,
-    //     comm: &Communicator,
-    // ) -> RmpiResult
-    // where
-    //     Buf: BufferRef;
-
-    // #[inline]
-    // fn scatter<SendBuf, RecvBuf>(
-    //     sendbuf: SendBuf,
-    //     recvbuf: RecvBuf,
-    //     root: Process,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
-    // #[inline]
-    // fn scatterv<SendBuf, RecvBuf>(
-    //     sendbufs: &[SendBuf],
-    //     recvbuf: RecvBuf,
-    //     root: Process,
-    // ) -> RmpiResult
-    // where
-    //     SendBuf: BufferRef,
-    //     RecvBuf: BufferMut;
 }

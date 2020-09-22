@@ -92,7 +92,7 @@ impl<'ctx> Communicator<'ctx> {
         {
             match self.raw {
                 MPI_COMM_NULL => unreachable!(),
-                MPI_COMM_WORLD | MPI_COMM_SELF => Self::from_raw(self.raw),
+                MPI_COMM_WORLD | MPI_COMM_SELF => Ok(Self::from_raw(self.raw)),
                 _ => {
                     let mut new_raw = MPI_COMM_NULL;
                     let res = Error::from_mpi_res(mpi_comm_dup(self.raw, &mut new_raw));

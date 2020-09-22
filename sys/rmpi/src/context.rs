@@ -2,7 +2,7 @@ use std::{
     ffi::{CStr, CString},
     marker::PhantomData,
     mem::{forget, transmute},
-    os::raw::{c_char, c_int},
+    os::raw::{c_char, c_double, c_int},
     ptr::{self, NonNull},
     slice,
 };
