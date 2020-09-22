@@ -255,7 +255,6 @@ impl Datatype {
                 Custom => {
                     let mut new_raw = MPI_DATATYPE_NULL;
                     let res = Error::from_mpi_res(mpi_type_dup(self.raw, &mut new_raw));
-                    forget(self);
                     res.map(|()| Self {
                         raw: new_raw,
                         kind: self.kind,

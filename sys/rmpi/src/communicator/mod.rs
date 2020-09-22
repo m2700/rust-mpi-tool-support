@@ -43,6 +43,12 @@ impl<'ctx> Deref for Communicator<'ctx> {
         &self.raw
     }
 }
+impl<'ctx> Clone for Communicator<'ctx> {
+    #[inline]
+    fn clone(&self) -> Self {
+        self.duplicate().unwrap()
+    }
+}
 impl<'ctx> Communicator<'ctx> {
     #[inline]
     pub unsafe fn from_raw(raw: MPI_Comm) -> Self {
@@ -76,6 +82,29 @@ impl<'ctx> Communicator<'ctx> {
     #[inline]
     pub fn current_process(&self) -> RmpiResult<Process> {
         Ok(self.get_process(self.current_rank()?))
+    }
+
+    tool_mode_item!(
+        #[inline]
+        pub unsafe fn duplicate_with<F>(&self, mpi_comm_dup: F) -> RmpiResult<Self>
+        where
+            F: FnOnce(MPI_Comm, *mut MPI_Comm) -> c_int,
+        {
+            match self.raw {
+                MPI_COMM_NULL => unreachable!(),
+                MPI_COMM_WORLD | MPI_COMM_SELF => Self::from_raw(self.raw),
+                _ => {
+                    let mut new_raw = MPI_COMM_NULL;
+                    let res = Error::from_mpi_res(mpi_comm_dup(self.raw, &mut new_raw));
+                    forget(self);
+                    res.map(|()| Self::from_raw(new_raw))
+                }
+            }
+        }
+    );
+    #[inline]
+    pub fn duplicate(&self) -> RmpiResult<Self> {
+        unsafe { self.duplicate_with(|comm, newcomm| MPI_Comm_dup(comm, newcomm)) }
     }
 
     tool_mode_item!(
