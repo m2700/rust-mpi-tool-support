@@ -105,16 +105,20 @@ impl MpiInterceptionLayer for MyQmpiLayer {
 
         let mut smmd_counters = [0; COUNTERS_LEN];
         comm_world
-            .allreduce(&counters[..], &mut smmd_counters[..], MpiOp::Sum)
+            .get_process(0)
+            .reduce(&counters[..], &mut smmd_counters[..], MpiOp::Sum)
             .unwrap();
+        let current_rank = comm_world.current_process()?.rank();
         drop(comm_world);
 
         next_f(rmpi_ctx)?;
 
-        for counter_id in 0..COUNTERS_LEN {
-            let count = smmd_counters[counter_id];
-            if count != 0 {
-                println!("{}: {}", COUNTER_NAMES[counter_id], count);
+        if current_rank == 0 {
+            for counter_id in 0..COUNTERS_LEN {
+                let count = smmd_counters[counter_id];
+                if count != 0 {
+                    println!("{}: {}", COUNTER_NAMES[counter_id], count);
+                }
             }
         }
 
