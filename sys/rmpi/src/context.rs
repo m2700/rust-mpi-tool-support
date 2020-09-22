@@ -152,4 +152,13 @@ impl RmpiContext {
     pub fn finalize(self) -> RmpiResult {
         unsafe { self.finalize_with(|| MPI_Finalize()) }
     }
+
+    #[inline]
+    pub fn wtime(&self) -> c_double {
+        unsafe { MPI_Wtime() }
+    }
+    #[inline]
+    pub fn wtick(&self) -> c_double {
+        unsafe { MPI_Wtick() }
+    }
 }
