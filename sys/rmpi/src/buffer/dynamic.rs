@@ -9,11 +9,12 @@ local_mod!(
 
 use super::*;
 
+/// A Buffer-Reference implementation where the Datatype is only known as runtime.
 #[derive(Debug, Clone, Copy)]
 pub struct TypeDynamicBufferRef<'b> {
     /// has to be alligned correctly for datatype
     buffer: &'b [u8],
-    /// has static lifetime, or lifetime is handled externally in unsafe block
+    /// has 'static lifetime, or lifetime is handled externally in unsafe block
     datatype: RawDatatype,
 }
 impl<'b> TypeDynamicBufferRef<'b> {
@@ -82,11 +83,13 @@ impl<'b> BufferRef for TypeDynamicBufferRef<'b> {
         )
     }
 }
+
+/// A Mutable Buffer-Reference implementation where the Datatype is only known as runtime.
 #[derive(Debug)]
 pub struct TypeDynamicBufferMut<'b> {
     /// has to be alligned correctly for datatype
     buffer: &'b mut [u8],
-    /// has static lifetime, or lifetime is handled externally in unsafe block
+    /// has 'static lifetime, or lifetime is handled externally in unsafe block
     datatype: RawDatatype,
 }
 impl<'b> TypeDynamicBufferMut<'b> {

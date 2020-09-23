@@ -14,6 +14,7 @@ local_mod!(
 
 use super::*;
 
+/// internal datatype matching
 macro_rules! define_datatype {
     ( type $dt_tp:ident = $datatype:expr; $ret:block dynamic $dynret:block ) => {{
         let datatype = simplify_datatype_rust($datatype);
@@ -72,6 +73,7 @@ macro_rules! define_datatype {
     }};
 }
 
+/// some C-types are the same thing on some platforms (e.g. int and int64_t), let them be the same
 #[inline]
 pub(super) fn simplify_datatype_rust(datatype: MPI_Datatype) -> MPI_Datatype {
     match datatype {
@@ -110,6 +112,7 @@ pub(super) fn simplify_datatype_rust(datatype: MPI_Datatype) -> MPI_Datatype {
     }
 }
 
+/// Used for buffer type matching, with fallback to dynamic buffer
 #[derive(Debug, Clone, Copy)]
 pub enum BufferRefKind<'a> {
     U8(&'a [u8]),
@@ -132,6 +135,7 @@ pub enum BufferRefKind<'a> {
     LongDoubleInt(&'a [LongDoubleInt]),
     TypeDynamic(TypeDynamicBufferRef<'a>),
 }
+/// Used for buffer type matching, with fallback to dynamic buffer
 #[derive(Debug)]
 pub enum BufferMutKind<'a> {
     U8(&'a mut [u8]),

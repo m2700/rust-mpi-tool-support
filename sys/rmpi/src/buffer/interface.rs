@@ -14,6 +14,7 @@ local_mod!(
 
 use super::*;
 
+/// Trait for all immutable buffer references (used for sending data)
 pub trait BufferRef: Sized {
     type Mut: BufferMut;
 
@@ -30,6 +31,7 @@ pub trait BufferRef: Sized {
         unsafe { RawDatatype::from_raw(self.item_datatype()) }.size()
     }
 }
+/// Trait for all mutable buffer references (used for receiving data)
 pub trait BufferMut: Sized + BufferRef {
     type Ref: BufferRef;
 
@@ -39,6 +41,7 @@ pub trait BufferMut: Sized + BufferRef {
     fn kind_mut(&mut self) -> BufferMutKind;
 }
 
+/// Trait for all unsized buffers with statically known type
 pub trait Buffer
 where
     for<'b> &'b Self: BufferRef,
@@ -52,6 +55,8 @@ where
     unsafe fn from_raw<'b>(buf: *const c_void, count: c_int) -> &'b Self;
     unsafe fn from_raw_mut<'b>(buf: *mut c_void, count: c_int) -> &'b mut Self;
 }
+
+/// a slice is a buffer if T is a datatype predefined in MPI
 impl<T> Buffer for [T]
 where
     T: MpiPredefinedDatatype,
@@ -168,6 +173,7 @@ where
     }
 }
 
+/// a reference to a buffer reference is also a buffer reference
 impl<'a, B> BufferRef for &'a B
 where
     B: BufferRef,
