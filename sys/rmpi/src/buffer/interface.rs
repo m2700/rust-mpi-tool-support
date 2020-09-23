@@ -15,7 +15,7 @@ local_mod!(
 use super::*;
 
 /// Trait for all immutable buffer references (used for sending data)
-pub trait BufferRef: Sized {
+pub trait BufferRef {
     type Mut: BufferMut;
 
     fn item_datatype(&self) -> MPI_Datatype;
@@ -32,7 +32,7 @@ pub trait BufferRef: Sized {
     }
 }
 /// Trait for all mutable buffer references (used for receiving data)
-pub trait BufferMut: Sized + BufferRef {
+pub trait BufferMut: BufferRef {
     type Ref: BufferRef;
 
     fn as_raw_mut(&mut self) -> (*mut c_void, c_int);
