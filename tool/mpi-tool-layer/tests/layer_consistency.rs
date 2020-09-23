@@ -1,5 +1,6 @@
 use self::rmpi::{
-    BufferRef, BufferRefKind, Process, RmpiContext, RmpiResult, Tag, TypeDynamicBufferRef,
+    init as rmpi_init, BufferRef, BufferRefKind, Process, RmpiContext, RmpiResult, Tag,
+    TypeDynamicBufferRef,
 };
 use mpi_sys::*;
 use mpi_tool_layer::{MpiInterceptionLayer, RawMpiInterceptionLayer, UnsafeBox};
@@ -32,6 +33,8 @@ fn mpi_send() {
         }
     }
 
+    let rmpi_context = rmpi_init(&mut &mut [][..]); // just to make sure MPI is initialized
+
     let buffer: &[i16] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     let raw_next_f = UnsafeBox::new(|buf_ptr, buf_len, datatype, dst, tag, comm| {
@@ -53,4 +56,6 @@ fn mpi_send() {
         7,
         MPI_COMM_WORLD,
     );
+
+    drop(rmpi_context);
 }
