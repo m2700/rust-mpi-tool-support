@@ -4,7 +4,7 @@ use std::{
 };
 
 use self::rmpi::{
-    BufferRef, BufferRefKind, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
+    BufferRef, BufferRefKind, Communicator, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
     TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 use mpi_tool_layer::MpiInterceptionLayer;
@@ -18,9 +18,10 @@ pub mod tool {
 
 const ATC0: AtomicUsize = AtomicUsize::new(0);
 
-const COUNTERS_LEN: usize = 12;
+const COUNTERS_LEN: usize = 18;
 static COUNTERS: [AtomicUsize; COUNTERS_LEN] = [
-    ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0,
+    ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0, ATC0,
+    ATC0, ATC0,
 ];
 
 static I8_SEND_COUNT: &AtomicUsize = &COUNTERS[0];
@@ -37,6 +38,13 @@ static I64_RECV_COUNT: &AtomicUsize = &COUNTERS[9];
 static FLOAT_RECV_COUNT: &AtomicUsize = &COUNTERS[10];
 static DOUBLE_RECV_COUNT: &AtomicUsize = &COUNTERS[11];
 
+static I8_RDC_COUNT: &AtomicUsize = &COUNTERS[12];
+static I16_RDC_COUNT: &AtomicUsize = &COUNTERS[13];
+static I32_RDC_COUNT: &AtomicUsize = &COUNTERS[14];
+static I64_RDC_COUNT: &AtomicUsize = &COUNTERS[15];
+static FLOAT_RDC_COUNT: &AtomicUsize = &COUNTERS[16];
+static DOUBLE_RDC_COUNT: &AtomicUsize = &COUNTERS[17];
+
 const COUNTER_NAMES: [&str; COUNTERS_LEN] = [
     "8-bit Intergers sent ",
     "16-bit Intergers sent",
@@ -50,29 +58,36 @@ const COUNTER_NAMES: [&str; COUNTERS_LEN] = [
     "64-bit Intergers received",
     "Floats received          ",
     "Doubles received         ",
+    "8-bit Intergers reduced ",
+    "16-bit Intergers reduced",
+    "32-bit Intergers reduced",
+    "64-bit Intergers reduced",
+    "Floats reduced          ",
+    "Doubles reduced         ",
 ];
 
-fn send_data_record(buf: TypeDynamicBufferRef) {
+fn send_data_record(buf: TypeDynamicBufferRef, recv_count: usize) {
+    let send_len = buf.len() * recv_count;
     match buf.kind_ref() {
-        BufferRefKind::U8(buf) => I8_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-        BufferRefKind::I8(buf) => I8_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U8(_) => I8_SEND_COUNT.fetch_add(send_len, Relaxed),
+        BufferRefKind::I8(_) => I8_SEND_COUNT.fetch_add(send_len, Relaxed),
 
-        BufferRefKind::U16(buf) => I16_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-        BufferRefKind::I16(buf) => I16_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U16(_) => I16_SEND_COUNT.fetch_add(send_len, Relaxed),
+        BufferRefKind::I16(_) => I16_SEND_COUNT.fetch_add(send_len, Relaxed),
 
-        BufferRefKind::U32(buf) => I32_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-        BufferRefKind::I32(buf) => I32_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U32(_) => I32_SEND_COUNT.fetch_add(send_len, Relaxed),
+        BufferRefKind::I32(_) => I32_SEND_COUNT.fetch_add(send_len, Relaxed),
 
-        BufferRefKind::U64(buf) => I64_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-        BufferRefKind::I64(buf) => I64_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::U64(_) => I64_SEND_COUNT.fetch_add(send_len, Relaxed),
+        BufferRefKind::I64(_) => I64_SEND_COUNT.fetch_add(send_len, Relaxed),
 
-        BufferRefKind::Float(buf) => FLOAT_SEND_COUNT.fetch_add(buf.len(), Relaxed),
-        BufferRefKind::Double(buf) => DOUBLE_SEND_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::Float(_) => FLOAT_SEND_COUNT.fetch_add(send_len, Relaxed),
+        BufferRefKind::Double(_) => DOUBLE_SEND_COUNT.fetch_add(send_len, Relaxed),
 
         _ => 0, /*ignored*/
     };
 }
-fn recv_data_record(buf: TypeDynamicBufferMut) {
+fn recv_data_record(buf: TypeDynamicBufferRef) {
     match buf.kind_ref() {
         BufferRefKind::U8(buf) => I8_RECV_COUNT.fetch_add(buf.len(), Relaxed),
         BufferRefKind::I8(buf) => I8_RECV_COUNT.fetch_add(buf.len(), Relaxed),
@@ -88,6 +103,26 @@ fn recv_data_record(buf: TypeDynamicBufferMut) {
 
         BufferRefKind::Float(buf) => FLOAT_RECV_COUNT.fetch_add(buf.len(), Relaxed),
         BufferRefKind::Double(buf) => DOUBLE_RECV_COUNT.fetch_add(buf.len(), Relaxed),
+
+        _ => 0, /*ignored*/
+    };
+}
+fn reduce_data_record(buf: TypeDynamicBufferRef) {
+    match buf.kind_ref() {
+        BufferRefKind::U8(buf) => I8_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I8(buf) => I8_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+
+        BufferRefKind::U16(buf) => I16_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I16(buf) => I16_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+
+        BufferRefKind::U32(buf) => I32_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I32(buf) => I32_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+
+        BufferRefKind::U64(buf) => I64_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::I64(buf) => I64_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+
+        BufferRefKind::Float(buf) => FLOAT_RDC_COUNT.fetch_add(buf.len(), Relaxed),
+        BufferRefKind::Double(buf) => DOUBLE_RDC_COUNT.fetch_add(buf.len(), Relaxed),
 
         _ => 0, /*ignored*/
     };
@@ -143,7 +178,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record(buf);
+            send_data_record(buf, 1);
         }
         res
     }
@@ -159,7 +194,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record(buf);
+            send_data_record(buf, 1);
         }
         res
     }
@@ -175,7 +210,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record(buf);
+            send_data_record(buf, 1);
         }
         res
     }
@@ -191,7 +226,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf, dest, tag);
         if res.is_ok() {
-            send_data_record(buf);
+            send_data_record(buf, 1);
         }
         res
     }
@@ -215,7 +250,92 @@ impl MpiInterceptionLayer for MyQmpiLayer {
     {
         let res = next_f(rmpi_ctx, buf.as_mut(), src, tag, status_ignore);
         if res.is_ok() {
-            recv_data_record(buf);
+            recv_data_record(buf.as_ref());
+        }
+        res
+    }
+
+    fn sendrecv<F>(
+        next_f: F,
+        rmpi_ctx: &RmpiContext,
+        sendbuf: TypeDynamicBufferRef,
+        dest: Process,
+        sendtag: Tag,
+        mut recvbuf: TypeDynamicBufferMut,
+        src: Process,
+        recvtag: Tag,
+        status_ignore: bool,
+    ) -> RmpiResult<Option<Status>>
+    where
+        F: FnOnce(
+            &RmpiContext,
+            TypeDynamicBufferRef,
+            Process,
+            Tag,
+            TypeDynamicBufferMut,
+            Process,
+            Tag,
+            bool,
+        ) -> RmpiResult<Option<Status>>,
+    {
+        let res = next_f(
+            rmpi_ctx,
+            sendbuf,
+            dest,
+            sendtag,
+            recvbuf.as_mut(),
+            src,
+            recvtag,
+            status_ignore,
+        );
+        if res.is_ok() {
+            send_data_record(sendbuf, 1);
+            recv_data_record(recvbuf.as_ref());
+        }
+        res
+    }
+
+    fn bcast<F>(
+        next_f: F,
+        rmpi_ctx: &RmpiContext,
+        mut buf: TypeDynamicBufferMut,
+        root: Process,
+    ) -> RmpiResult
+    where
+        F: FnOnce(&RmpiContext, TypeDynamicBufferMut, Process) -> RmpiResult,
+    {
+        let res = next_f(rmpi_ctx, buf.as_mut(), root);
+        if res.is_ok() {
+            let comm_world = rmpi_ctx.comm_world();
+            if comm_world.current_process()?.rank() == root.rank() {
+                send_data_record(buf.as_ref(), comm_world.size()? as usize - 1);
+            } else {
+                recv_data_record(buf.as_ref());
+            }
+        }
+        res
+    }
+
+    fn allreduce<F>(
+        next_f: F,
+        rmpi_ctx: &RmpiContext,
+        sendbuf: TypeDynamicBufferRef,
+        mut recvbuf: TypeDynamicBufferMut,
+        op: MpiOp,
+        comm: &Communicator,
+    ) -> RmpiResult
+    where
+        F: FnOnce(
+            &RmpiContext,
+            TypeDynamicBufferRef,
+            TypeDynamicBufferMut,
+            MpiOp,
+            &Communicator,
+        ) -> RmpiResult,
+    {
+        let res = next_f(rmpi_ctx, sendbuf, recvbuf.as_mut(), op, comm);
+        if res.is_ok() {
+            reduce_data_record(recvbuf.as_ref());
         }
         res
     }
