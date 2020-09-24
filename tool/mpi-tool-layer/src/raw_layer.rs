@@ -4,7 +4,7 @@ use mpi_sys::pmpi::*;
 
 use crate::UnsafeBox;
 
-pub trait RawMpiInterceptionLayer {
+pub unsafe trait RawMpiInterceptionLayer {
     #[inline]
     fn send<F>(
         next_f: UnsafeBox<F>,

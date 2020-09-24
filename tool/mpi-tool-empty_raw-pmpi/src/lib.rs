@@ -3,7 +3,7 @@ use std::{env, os::raw::c_int};
 use mpi_tool_layer::{RawMpiInterceptionLayer, UnsafeBox};
 
 struct MyPmpiLayer;
-impl RawMpiInterceptionLayer for MyPmpiLayer {
+unsafe impl RawMpiInterceptionLayer for MyPmpiLayer {
     fn finalize<F>(next_f: UnsafeBox<F>) -> c_int
     where
         F: FnOnce() -> c_int,

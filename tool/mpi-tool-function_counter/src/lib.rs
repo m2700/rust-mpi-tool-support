@@ -17,7 +17,7 @@ pub mod tool {
 }
 
 struct MyQmpiLayer;
-impl RawMpiInterceptionLayer for MyQmpiLayer {
+unsafe impl RawMpiInterceptionLayer for MyQmpiLayer {
     #[inline]
     fn finalize<F>(next_f: UnsafeBox<F>) -> ::std::os::raw::c_int
     where

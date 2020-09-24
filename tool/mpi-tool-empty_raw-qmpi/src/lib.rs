@@ -3,7 +3,7 @@ use std::{env, os::raw::c_int};
 use mpi_tool_layer::{RawMpiInterceptionLayer, UnsafeBox};
 
 struct MyQmpiLayer;
-impl RawMpiInterceptionLayer for MyQmpiLayer {
+unsafe impl RawMpiInterceptionLayer for MyQmpiLayer {
     fn finalize<F>(next_f: UnsafeBox<F>) -> c_int
     where
         F: FnOnce() -> c_int,

@@ -18,7 +18,7 @@ use crate::{RawMpiInterceptionLayer, UnsafeBox};
 
 use super::{buffers_from_displs, buffers_mut_from_displs, MpiInterceptionLayer};
 
-impl<T> RawMpiInterceptionLayer for T
+unsafe impl<T> RawMpiInterceptionLayer for T
 where
     T: MpiInterceptionLayer,
 {
