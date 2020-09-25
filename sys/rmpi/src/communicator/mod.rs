@@ -30,11 +30,7 @@ pub struct Communicator<'ctx> {
 impl<'ctx> Drop for Communicator<'ctx> {
     #[inline]
     fn drop(&mut self) {
-        match self.raw {
-            MPI_COMM_NULL => unreachable!(),
-            MPI_COMM_WORLD | MPI_COMM_SELF => {}
-            _ => unsafe { ptr::read(self).free().unwrap() },
-        }
+        unsafe { ptr::read(self).free().unwrap() }
     }
 }
 impl<'ctx> Deref for Communicator<'ctx> {
@@ -90,16 +86,10 @@ impl<'ctx> Communicator<'ctx> {
         where
             F: FnOnce(MPI_Comm, *mut MPI_Comm) -> c_int,
         {
-            match self.raw {
-                MPI_COMM_NULL => unreachable!(),
-                MPI_COMM_WORLD | MPI_COMM_SELF => Ok(Self::from_raw(self.raw)),
-                _ => {
-                    let mut new_raw = MPI_COMM_NULL;
-                    let res = Error::from_mpi_res(mpi_comm_dup(self.raw, &mut new_raw));
-                    forget(self);
-                    res.map(|()| Self::from_raw(new_raw))
-                }
-            }
+            let mut new_raw = MPI_COMM_NULL;
+            let res = Error::from_mpi_res(mpi_comm_dup(self.raw, &mut new_raw));
+            forget(self);
+            res.map(|()| Self::from_raw(new_raw))
         }
     );
     #[inline]

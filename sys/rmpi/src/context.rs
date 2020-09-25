@@ -130,12 +130,12 @@ impl RmpiContext {
     }
 
     #[inline]
-    pub fn comm_world(&self) -> Communicator {
-        unsafe { Communicator::from_raw(MPI_COMM_WORLD) }
+    pub fn comm_world(&self) -> &Communicator {
+        unsafe { Communicator::from_raw_ref(&MPI_COMM_WORLD) }
     }
     #[inline]
-    pub fn comm_self(&self) -> Communicator {
-        unsafe { Communicator::from_raw(MPI_COMM_SELF) }
+    pub fn comm_self(&self) -> &Communicator {
+        unsafe { Communicator::from_raw_ref(&MPI_COMM_SELF) }
     }
 
     tool_mode_item!(
