@@ -1,4 +1,6 @@
-use self::rmpi::{BufferRef, BufferRefKind, Process, RmpiContext, RmpiResult, Tag};
+use self::rmpi::{
+    BufferRef, BufferRefKind, Process, RmpiContext, RmpiResult, Tag, TypeDynamicBufferRef,
+};
 use mpi_sys::*;
 use mpi_tool_layer::{MpiInterceptionLayer, RawMpiInterceptionLayer, UnsafeBox};
 use rmpi::pmpi_mode as rmpi;
@@ -8,16 +10,15 @@ use std::os::raw::*;
 fn mpi_send() {
     enum EmptyLayer {}
     impl MpiInterceptionLayer for EmptyLayer {
-        fn send<F, Buf>(
+        fn send<F>(
             next_f: F,
             rmpi_context: &RmpiContext,
-            buf: Buf,
+            buf: TypeDynamicBufferRef,
             dest: Process,
             tag: Tag,
         ) -> RmpiResult
         where
-            F: FnOnce(&RmpiContext, Buf, Process, Tag) -> RmpiResult,
-            Buf: BufferRef,
+            F: FnOnce(&RmpiContext, TypeDynamicBufferRef, Process, Tag) -> RmpiResult,
         {
             match buf.kind_ref() {
                 BufferRefKind::I16(i16buf) => assert_eq!(i16buf, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),

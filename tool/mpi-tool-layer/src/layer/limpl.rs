@@ -7,16 +7,16 @@ use std::{
 use rmpi::pmpi_mode as rmpi;
 
 use self::rmpi::{
-    datatype::{MpiPredefinedDatatype, RawDatatype},
+    datatype::RawDatatype,
     request::{Request, RequestSlice},
-    Buffer, BufferMut, BufferRef, CStrMutPtr, Communicator, Group, Process, RmpiContext, Status,
+    BufferMut, BufferRef, CStrMutPtr, Communicator, Group, Process, RmpiContext, Status,
     TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 use mpi_sys::pmpi::*;
 
 use crate::{RawMpiInterceptionLayer, UnsafeBox};
 
-use super::MpiInterceptionLayer;
+use super::{buffers_from_displs, buffers_mut_from_displs, MpiInterceptionLayer};
 
 impl<T> RawMpiInterceptionLayer for T
 where
@@ -193,21 +193,14 @@ where
             tag: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::send(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.send_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        )
-                    )
-                }
-            )
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::send(
+                |_rmpi_ctx, buf, dest, tag| unsafe { dest.send_with(next_f.unwrap(), buf, tag) },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                buffer,
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                tag.into(),
+            ))
         }
         #[inline]
         fn bsend(
@@ -219,21 +212,14 @@ where
             tag: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::bsend(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.bsend_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        )
-                    )
-                }
-            )
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::bsend(
+                |_rmpi_ctx, buf, dest, tag| unsafe { dest.bsend_with(next_f.unwrap(), buf, tag) },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                buffer,
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                tag.into(),
+            ))
         }
         #[inline]
         fn ssend(
@@ -245,21 +231,14 @@ where
             tag: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::ssend(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.ssend_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        )
-                    )
-                }
-            )
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::ssend(
+                |_rmpi_ctx, buf, dest, tag| unsafe { dest.ssend_with(next_f.unwrap(), buf, tag) },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                buffer,
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                tag.into(),
+            ))
         }
         #[inline]
         fn rsend(
@@ -271,21 +250,14 @@ where
             tag: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::rsend(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.rsend_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        )
-                    )
-                }
-            )
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::rsend(
+                |_rmpi_ctx, buf, dest, tag| unsafe { dest.rsend_with(next_f.unwrap(), buf, tag) },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                buffer,
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                tag.into(),
+            ))
         }
 
         #[inline]
@@ -299,23 +271,21 @@ where
             comm: MPI_Comm,
             request: *mut MPI_Request,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::isend(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.isend_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        ).map(|rq|{
-                            unsafe{request.write(rq.into_raw())};
-                            ()
-                        })
-                    )
-                }
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::isend(
+                    |_rmpi_ctx, buf, dest, tag| unsafe {
+                        dest.isend_with(next_f.unwrap(), buf, tag)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                    tag.into(),
+                )
+                .map(|rq| {
+                    unsafe { request.write(rq.into_raw()) };
+                    ()
+                }),
             )
         }
         #[inline]
@@ -329,23 +299,21 @@ where
             comm: MPI_Comm,
             request: *mut MPI_Request,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::ibsend(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.ibsend_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        ).map(|rq|{
-                            unsafe{request.write(rq.into_raw())};
-                            ()
-                        })
-                    )
-                }
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::ibsend(
+                    |_rmpi_ctx, buf, dest, tag| unsafe {
+                        dest.ibsend_with(next_f.unwrap(), buf, tag)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                    tag.into(),
+                )
+                .map(|rq| {
+                    unsafe { request.write(rq.into_raw()) };
+                    ()
+                }),
             )
         }
         #[inline]
@@ -359,23 +327,21 @@ where
             comm: MPI_Comm,
             request: *mut MPI_Request,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::issend(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.issend_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        ).map(|rq|{
-                            unsafe{request.write(rq.into_raw())};
-                            ()
-                        })
-                    )
-                }
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::issend(
+                    |_rmpi_ctx, buf, dest, tag| unsafe {
+                        dest.issend_with(next_f.unwrap(), buf, tag)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                    tag.into(),
+                )
+                .map(|rq| {
+                    unsafe { request.write(rq.into_raw()) };
+                    ()
+                }),
             )
         }
         #[inline]
@@ -389,23 +355,21 @@ where
             comm: MPI_Comm,
             request: *mut MPI_Request,
         ) -> c_int {
-            unsafe_with_buf!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::irsend(
-                            |_rmpi_ctx,buf, dest, tag| {
-                                unsafe{dest.irsend_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                            tag.into(),
-                        ).map(|rq|{
-                            unsafe{request.write(rq.into_raw())};
-                            ()
-                        })
-                    )
-                }
+            let buffer = unsafe { TypeDynamicBufferRef::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::irsend(
+                    |_rmpi_ctx, buf, dest, tag| unsafe {
+                        dest.irsend_with(next_f.unwrap(), buf, tag)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                    tag.into(),
+                )
+                .map(|rq| {
+                    unsafe { request.write(rq.into_raw()) };
+                    ()
+                }),
             )
         }
 
@@ -420,25 +384,23 @@ where
             comm: MPI_Comm,
             status: *mut MPI_Status,
         ) -> c_int {
-            unsafe_with_buf_mut!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::recv(
-                            |_rmpi_ctx,buf, dest, tag, status_ignore| {
-                                unsafe{dest.recv_with(next_f.unwrap(), buf, tag, status_ignore)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
-                            tag.into(),
-                            (status as *const MPI_Status) == MPI_STATUS_IGNORE,
-                        ).map(|opt_status_ret|{
-                            if let Some(status_ret) = opt_status_ret {
-                                unsafe{status.write(status_ret.into_raw())};
-                            }
-                        })
-                    )
-                }
+            let buffer = unsafe { TypeDynamicBufferMut::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::recv(
+                    |_rmpi_ctx, buf, dest, tag, status_ignore| unsafe {
+                        dest.recv_with(next_f.unwrap(), buf, tag, status_ignore)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(source),
+                    tag.into(),
+                    (status as *const MPI_Status) == MPI_STATUS_IGNORE,
+                )
+                .map(|opt_status_ret| {
+                    if let Some(status_ret) = opt_status_ret {
+                        unsafe { status.write(status_ret.into_raw()) };
+                    }
+                }),
             )
         }
 
@@ -453,23 +415,21 @@ where
             comm: MPI_Comm,
             request: *mut MPI_Request,
         ) -> c_int {
-            unsafe_with_buf_mut!(
-                (buf,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::irecv(
-                            |_rmpi_ctx,buf, source, tag| {
-                                unsafe{source.irecv_with(next_f.unwrap(), buf, tag)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer,
-                            unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
-                            tag.into(),
-                        ).map(|rq|{
-                            unsafe{request.write(rq.into_raw())};
-                            ()
-                        })
-                    )
-                }
+            let buffer = unsafe { TypeDynamicBufferMut::from_raw_dynamic(buf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::irecv(
+                    |_rmpi_ctx, buf, source, tag| unsafe {
+                        source.irecv_with(next_f.unwrap(), buf, tag)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(source),
+                    tag.into(),
+                )
+                .map(|rq| {
+                    unsafe { request.write(rq.into_raw()) };
+                    ()
+                }),
             )
         }
 
@@ -489,40 +449,38 @@ where
             comm: MPI_Comm,
             status: *mut MPI_Status,
         ) -> c_int {
-            unsafe_with_buf!(
-                (sendbuf,sendcount,sendtype) => send_buffer => {
-                    unsafe_with_buf_mut!(
-                        (recvbuf,recvcount,recvtype) => recv_buffer => {
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::sendrecv(
-                                    |_rmpi_ctx, sendbuf, dest, sendtag,
-                                     recvbuf, src, recvtag,
-                                     status_ignore| {
-                                        unsafe {
-                                            Process::sendrecv_with(
-                                                next_f.unwrap(),
-                                                sendbuf, dest, sendtag,
-                                                recvbuf, src, recvtag, status_ignore
-                                            )
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(dest),
-                                    sendtag.into(),
-                                    recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(source),
-                                    recvtag.into(),
-                                    status == MPI_STATUS_IGNORE,
-                                ).map(|opt_status_ret|{
-                                    if let Some(status_ret) = opt_status_ret {
-                                        unsafe{status.write(status_ret.into_raw())};
-                                    }
-                                })
-                            )
-                        }
-                    )
-                }
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, sendcount, sendtype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, recvcount, recvtype) };
+            rmpi::Error::result_into_mpi_res(
+                <Self as MpiInterceptionLayer>::sendrecv(
+                    |_rmpi_ctx, sendbuf, dest, sendtag, recvbuf, src, recvtag, status_ignore| unsafe {
+                        Process::sendrecv_with(
+                            next_f.unwrap(),
+                            sendbuf,
+                            dest,
+                            sendtag,
+                            recvbuf,
+                            src,
+                            recvtag,
+                            status_ignore,
+                        )
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    send_buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(dest),
+                    sendtag.into(),
+                    recv_buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(source),
+                    recvtag.into(),
+                    status == MPI_STATUS_IGNORE,
+                )
+                .map(|opt_status_ret| {
+                    if let Some(status_ret) = opt_status_ret {
+                        unsafe { status.write(status_ret.into_raw()) };
+                    }
+                }),
             )
         }
 
@@ -778,19 +736,13 @@ where
             root: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf_mut!(
-                (buffer,count,datatype) => buffer => {
-                    rmpi::Error::result_into_mpi_res(
-                        <Self as MpiInterceptionLayer>::bcast(
-                            |_rmpi_ctx,buf, root| {
-                                unsafe{root.bcast_with(next_f.unwrap(), buf)}
-                            },
-                            unsafe { RmpiContext::create_unchecked_ref() },
-                            buffer, unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
-                        )
-                    )
-                }
-            )
+            let buffer = unsafe { TypeDynamicBufferMut::from_raw_dynamic(buffer, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::bcast(
+                |_rmpi_ctx, buf, root| unsafe { root.bcast_with(next_f.unwrap(), buf) },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                buffer,
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
+            ))
         }
 
         #[inline]
@@ -805,26 +757,19 @@ where
             root: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (sendbuf, sendcount, sendtype) => send_buffer => {
-                    unsafe_with_buf_mut!(
-                        (recvbuf, recvcount, recvtype) => recv_buffer => {
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::gather(
-                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
-                                        unsafe {
-                                            root.gather_with(next_f.unwrap(), send_buffer, recv_buffer)
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
-                                )
-                            )
-                        }
-                    )
-                }
-            )
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, sendcount, sendtype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, recvcount, recvtype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::gather(
+                |_rmpi_ctx, send_buffer, recv_buffer, root| unsafe {
+                    root.gather_with(next_f.unwrap(), send_buffer, recv_buffer)
+                },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                send_buffer,
+                recv_buffer,
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
+            ))
         }
         #[inline]
         fn gatherv(
@@ -839,78 +784,21 @@ where
             root: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (sendbuf, sendcount, sendtype) => send_buffer => {
-                    define_datatype!(
-                        type RecvElem = recvtype;
-                        {
-                            let recvbuf = recvbuf as *mut RecvElem;
-                            let mut recv_buffers = vec![];
-                            if !(recvbuf.is_null() || recvcounts.is_null() || displs.is_null()) {
-                                for recv_rank in
-                                        0..unsafe{Communicator::from_raw_ref(&comm)}
-                                            .size().unwrap(){
-                                    let recv_buffer_part = unsafe {
-                                        <[RecvElem] as Buffer>::from_raw_mut(
-                                            recvbuf.add(
-                                                *displs.add(recv_rank as usize) as usize
-                                            ) as *mut c_void,
-                                            *recvcounts.add(recv_rank as usize)
-                                        )
-                                    };
-                                    recv_buffers.push(recv_buffer_part);
-                                };
-                            }
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::gatherv(
-                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
-                                        unsafe {
-                                            root.gatherv_with(next_f.unwrap(), send_buffer, recv_buffer)
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer, &mut recv_buffers,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
-                                )
-                            )
-                        }
-                        dynamic {
-                            let recvtype = unsafe{RawDatatype::from_raw(recvtype)};
-                            let recvbuf = recvbuf as *mut c_void;
-                            let mut recv_buffers = vec![];
-                            rmpi::Error::result_into_mpi_res((||{
-                                if !(recvbuf.is_null() || recvcounts.is_null() || displs.is_null()) {
-                                    for recv_rank in
-                                            0..unsafe{Communicator::from_raw_ref(&comm)}
-                                                .size().unwrap(){
-                                        let recv_buffer_part = unsafe {
-                                            TypeDynamicBufferMut::from_raw_dynamic(
-                                                recvbuf.add(
-                                                    (*displs.add(recv_rank as usize) as usize)
-                                                    * (recvtype.size()? as usize)
-                                                ) as *mut c_void,
-                                                *recvcounts.add(recv_rank as usize),
-                                                recvtype.as_raw()
-                                            )
-                                        };
-                                        recv_buffers.push(recv_buffer_part);
-                                    };
-                                }
-                                <Self as MpiInterceptionLayer>::gatherv(
-                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
-                                        unsafe {
-                                            root.gatherv_with(next_f.unwrap(), send_buffer, recv_buffer)
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer, &mut recv_buffers,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
-                                )
-                            })())
-                        }
-                    )
-                }
-            )
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, sendcount, sendtype) };
+            rmpi::Error::result_into_mpi_res((|| {
+                let mut recv_buffers =
+                    buffers_mut_from_displs(recvbuf, recvcounts, displs, recvtype, comm)?;
+                <Self as MpiInterceptionLayer>::gatherv(
+                    |_rmpi_ctx, send_buffer, recv_buffer, root| unsafe {
+                        root.gatherv_with(next_f.unwrap(), send_buffer, recv_buffer)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    send_buffer,
+                    &mut recv_buffers,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
+                )
+            })())
         }
 
         #[inline]
@@ -924,26 +812,19 @@ where
             recvtype: MPI_Datatype,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (sendbuf, sendcount, sendtype) => send_buffer => {
-                    unsafe_with_buf_mut!(
-                        (recvbuf, recvcount, recvtype) => recv_buffer => {
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::allgather(
-                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| {
-                                        unsafe {
-                                            communicator.allgather_with(next_f.unwrap(), send_buffer, recv_buffer)
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)},
-                                )
-                            )
-                        }
-                    )
-                }
-            )
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, sendcount, sendtype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, recvcount, recvtype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allgather(
+                |_rmpi_ctx, send_buffer, recv_buffer, communicator| unsafe {
+                    communicator.allgather_with(next_f.unwrap(), send_buffer, recv_buffer)
+                },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                send_buffer,
+                recv_buffer,
+                unsafe { Communicator::from_raw_ref(&comm) },
+            ))
         }
         #[inline]
         fn allgatherv(
@@ -957,43 +838,22 @@ where
             recvtype: MPI_Datatype,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (sendbuf, sendcount, sendtype) => send_buffer => {
-                    define_datatype!(
-                        type RecvElem = recvtype;
-                        {
-                            let recvbuf = recvbuf as *mut RecvElem;
-                            let mut recv_buffers = vec![];
-                            for recv_rank in
-                                    0..unsafe{Communicator::from_raw_ref(&comm)}.size().unwrap(){
-                                let recv_buffer_part = unsafe {
-                                    <[RecvElem] as Buffer>::from_raw_mut(
-                                        recvbuf.add(
-                                            *displs.add(recv_rank as usize) as usize
-                                        ) as *mut c_void,
-                                        *recvcounts.add(recv_rank as usize)
-                                    )
-                                };
-                                recv_buffers.push(recv_buffer_part);
-                            };
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::allgatherv(
-                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| {
-                                        unsafe {
-                                            communicator.allgatherv_with(
-                                                next_f.unwrap(), send_buffer, recv_buffer
-                                            )
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer, &mut recv_buffers,
-                                    unsafe{Communicator::from_raw_ref(&comm)},
-                                )
-                            )
-                        }
-                    )
-                }
-            )
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, sendcount, sendtype) };
+
+            rmpi::Error::result_into_mpi_res((|| {
+                let mut recv_buffers =
+                    buffers_mut_from_displs(recvbuf, recvcounts, displs, recvtype, comm)?;
+                <Self as MpiInterceptionLayer>::allgatherv(
+                    |_rmpi_ctx, send_buffer, recv_buffer, root| unsafe {
+                        root.allgatherv_with(next_f.unwrap(), send_buffer, recv_buffer)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    send_buffer,
+                    &mut recv_buffers,
+                    unsafe { Communicator::from_raw_ref(&comm) },
+                )
+            })())
         }
 
         #[inline]
@@ -1007,26 +867,19 @@ where
             recvtype: MPI_Datatype,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (sendbuf, sendcount, sendtype) => send_buffer => {
-                    unsafe_with_buf_mut!(
-                        (recvbuf, recvcount, recvtype) => recv_buffer => {
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::alltoall(
-                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| {
-                                        unsafe {
-                                            communicator.alltoall_with(next_f.unwrap(), send_buffer, recv_buffer)
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)},
-                                )
-                            )
-                        }
-                    )
-                }
-            )
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, sendcount, sendtype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, recvcount, recvtype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::alltoall(
+                |_rmpi_ctx, send_buffer, recv_buffer, communicator| unsafe {
+                    communicator.alltoall_with(next_f.unwrap(), send_buffer, recv_buffer)
+                },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                send_buffer,
+                recv_buffer,
+                unsafe { Communicator::from_raw_ref(&comm) },
+            ))
         }
         #[inline]
         fn alltoallv(
@@ -1041,57 +894,21 @@ where
             recvtype: MPI_Datatype,
             comm: MPI_Comm,
         ) -> c_int {
-            define_datatype! {
-                type SendElem = sendtype;
-                {
-                    let sendbuf = sendbuf as *mut SendElem;
-                    let mut send_buffers = vec![];
-                    for send_rank in 0..unsafe { Communicator::from_raw_ref(&comm) }.size().unwrap() {
-                        let send_buffer_part = unsafe {
-                            <[SendElem] as Buffer>::from_raw(
-                                sendbuf.add(*sdispls.add(send_rank as usize) as usize) as *mut c_void,
-                                *sendcounts.add(send_rank as usize),
-                            )
-                        };
-                        send_buffers.push(send_buffer_part);
-                    }
-
-                    define_datatype!{
-                        type RecvElem = recvtype;
-                        {
-                            let recvbuf = recvbuf as *mut RecvElem;
-                            let mut recv_buffers = vec![];
-                            for recv_rank in
-                                0..unsafe {
-                                        Communicator::from_raw_ref(&comm)
-                                    }.size().unwrap()
-                            {
-                                let recv_buffer_part = unsafe {
-                                    <[RecvElem] as Buffer>::from_raw_mut(
-                                        recvbuf.add(*rdispls.add(recv_rank as usize) as usize)
-                                            as *mut c_void,
-                                        *recvcounts.add(recv_rank as usize),
-                                    )
-                                };
-                                recv_buffers.push(recv_buffer_part);
-                            }
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::alltoallv(
-                                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| unsafe {
-                                        communicator.alltoallv_with(
-                                            next_f.unwrap(), send_buffer, recv_buffer
-                                        )
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    &send_buffers,
-                                    &mut recv_buffers,
-                                    unsafe { Communicator::from_raw_ref(&comm) },
-                                )
-                            )
-                        }
-                    }
-                }
-            }
+            rmpi::Error::result_into_mpi_res((|| {
+                let send_buffers =
+                    buffers_from_displs(sendbuf, sendcounts, sdispls, sendtype, comm)?;
+                let mut recv_buffers =
+                    buffers_mut_from_displs(recvbuf, recvcounts, rdispls, recvtype, comm)?;
+                <Self as MpiInterceptionLayer>::alltoallv(
+                    |_rmpi_ctx, send_buffer, recv_buffer, communicator| unsafe {
+                        communicator.alltoallv_with(next_f.unwrap(), send_buffer, recv_buffer)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    &send_buffers,
+                    &mut recv_buffers,
+                    unsafe { Communicator::from_raw_ref(&comm) },
+                )
+            })())
         }
 
         #[inline]
@@ -1105,43 +922,20 @@ where
             root: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            define_datatype! {
-                type Elem = datatype;
-                {
-                    let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
-                    let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
-                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::reduce(
-                        |_rmpi_ctx, send_buffer, recv_buffer, op, root| unsafe {
-                            root.reduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
-                        },
-                        unsafe { RmpiContext::create_unchecked_ref() },
-                        send_buffer,
-                        recv_buffer,
-                        op.into(),
-                        unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
-                    ))
-                }
-                dynamic {
-                    let send_buffer = unsafe {
-                        TypeDynamicBufferRef::from_raw_dynamic(sendbuf, count, datatype)
-                    };
-                    let recv_buffer = unsafe {
-                        TypeDynamicBufferMut::from_raw_dynamic(
-                            recvbuf, count, datatype
-                        )
-                    };
-                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::reduce(
-                        |_rmpi_ctx, send_buffer, recv_buffer, op, root| unsafe {
-                            root.reduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
-                        },
-                        unsafe { RmpiContext::create_unchecked_ref() },
-                        send_buffer,
-                        recv_buffer,
-                        op.into(),
-                        unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
-                    ))
-                }
-            }
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, count, datatype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::reduce(
+                |_rmpi_ctx, send_buffer, recv_buffer, op, root| unsafe {
+                    root.reduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
+                },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                send_buffer,
+                recv_buffer,
+                op.into(),
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
+            ))
         }
         #[inline]
         fn allreduce(
@@ -1153,41 +947,20 @@ where
             op: MPI_Op,
             comm: MPI_Comm,
         ) -> c_int {
-            define_datatype! {
-                type Elem = datatype;
-                {
-                    let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
-                    let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
-                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
-                        |_rmpi_ctx, send_buffer, recv_buffer, op, communicator| unsafe {
-                            communicator.allreduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
-                        },
-                        unsafe { RmpiContext::create_unchecked_ref() },
-                        send_buffer,
-                        recv_buffer,
-                        op.into(),
-                        unsafe { Communicator::from_raw_ref(&comm) },
-                    ))
-                }
-                dynamic {
-                    let send_buffer = unsafe {
-                        TypeDynamicBufferRef::from_raw_dynamic(sendbuf, count, datatype)
-                    };
-                    let recv_buffer = unsafe {
-                        TypeDynamicBufferMut::from_raw_dynamic(recvbuf, count, datatype)
-                    };
-                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
-                        |_rmpi_ctx, send_buffer, recv_buffer, op, communicator| unsafe {
-                            communicator.allreduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
-                        },
-                        unsafe { RmpiContext::create_unchecked_ref() },
-                        send_buffer,
-                        recv_buffer,
-                        op.into(),
-                        unsafe { Communicator::from_raw_ref(&comm) },
-                    ))
-                }
-            }
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, count, datatype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::allreduce(
+                |_rmpi_ctx, send_buffer, recv_buffer, op, communicator| unsafe {
+                    communicator.allreduce_with(next_f.unwrap(), send_buffer, recv_buffer, op)
+                },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                send_buffer,
+                recv_buffer,
+                op.into(),
+                unsafe { Communicator::from_raw_ref(&comm) },
+            ))
         }
 
         #[inline]
@@ -1200,45 +973,20 @@ where
             op: MPI_Op,
             comm: MPI_Comm,
         ) -> c_int {
-            define_datatype! {
-                type Elem = datatype;
-                {
-                    let send_buffer = unsafe { <[Elem] as Buffer>::from_raw(sendbuf, count) };
-                    let recv_buffer = unsafe { <[Elem] as Buffer>::from_raw_mut(recvbuf, count) };
-                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scan(
-                        |_rmpi_ctx,send_buffer, recv_buffer, op, communicator| unsafe {
-                            communicator.scan_with(next_f.unwrap(), send_buffer, recv_buffer, op)
-                        },
-                        unsafe { RmpiContext::create_unchecked_ref() },
-                        send_buffer,
-                        recv_buffer,
-                        op.into(),
-                        unsafe { Communicator::from_raw_ref(&comm) },
-                    ))
-                }
-                dynamic {
-                    let send_buffer = unsafe {
-                        TypeDynamicBufferRef::from_raw_dynamic(
-                            sendbuf, count, datatype
-                        )
-                    };
-                    let recv_buffer = unsafe {
-                        TypeDynamicBufferMut::from_raw_dynamic(
-                            recvbuf, count, datatype
-                        )
-                    };
-                    rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scan(
-                        |_rmpi_ctx,send_buffer, recv_buffer, op, communicator| unsafe {
-                            communicator.scan_with(next_f.unwrap(), send_buffer, recv_buffer, op)
-                        },
-                        unsafe { RmpiContext::create_unchecked_ref() },
-                        send_buffer,
-                        recv_buffer,
-                        op.into(),
-                        unsafe { Communicator::from_raw_ref(&comm) },
-                    ))
-                }
-            }
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, count, datatype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, count, datatype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scan(
+                |_rmpi_ctx, send_buffer, recv_buffer, op, communicator| unsafe {
+                    communicator.scan_with(next_f.unwrap(), send_buffer, recv_buffer, op)
+                },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                send_buffer,
+                recv_buffer,
+                op.into(),
+                unsafe { Communicator::from_raw_ref(&comm) },
+            ))
         }
 
         #[inline]
@@ -1253,26 +1001,19 @@ where
             root: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf!(
-                (sendbuf, sendcount, sendtype) => send_buffer => {
-                    unsafe_with_buf_mut!(
-                        (recvbuf, recvcount, recvtype) => recv_buffer => {
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::scatter(
-                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
-                                        unsafe {
-                                            root.scatter_with(next_f.unwrap(), send_buffer, recv_buffer)
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    send_buffer, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
-                                )
-                            )
-                        }
-                    )
-                }
-            )
+            let send_buffer =
+                unsafe { TypeDynamicBufferRef::from_raw_dynamic(sendbuf, sendcount, sendtype) };
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, recvcount, recvtype) };
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::scatter(
+                |_rmpi_ctx, send_buffer, recv_buffer, root| unsafe {
+                    root.scatter_with(next_f.unwrap(), send_buffer, recv_buffer)
+                },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                send_buffer,
+                recv_buffer,
+                unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
+            ))
         }
         #[inline]
         fn scatterv(
@@ -1287,86 +1028,22 @@ where
             root: c_int,
             comm: MPI_Comm,
         ) -> c_int {
-            unsafe_with_buf_mut!(
-                (recvbuf, recvcount, recvtype) => recv_buffer => {
-                    define_datatype!(
-                        type SendElem = sendtype;
-                        {
-                            let sendbuf = sendbuf as *const SendElem;
-                            let mut send_buffers = vec![];
-                            if !(sendbuf.is_null() || sendcounts.is_null() || displs.is_null()) {
-                                for send_rank in
-                                        0..unsafe{Communicator::from_raw_ref(&comm)}
-                                            .size().unwrap(){
-                                    let send_buffer_part = unsafe {
-                                        <[SendElem] as Buffer>::from_raw(
-                                            sendbuf.add(
-                                                *displs.add(send_rank as usize) as usize
-                                            ) as *const c_void,
-                                            *sendcounts.add(send_rank as usize)
-                                        )
-                                    };
-                                    send_buffers.push(send_buffer_part);
-                                };
-                            }
-                            rmpi::Error::result_into_mpi_res(
-                                <Self as MpiInterceptionLayer>::scatterv(
-                                    |_rmpi_ctx,send_buffer, recv_buffer, root| {
-                                        unsafe {
-                                            root.scatterv_with(next_f.unwrap(), send_buffer, recv_buffer)
-                                        }
-                                    },
-                                    unsafe { RmpiContext::create_unchecked_ref() },
-                                    &send_buffers, recv_buffer,
-                                    unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
-                                )
-                            )
-                        }
-                        dynamic {
-                            let sendtype = unsafe{RawDatatype::from_raw(sendtype)};
-                            let sendbuf = sendbuf as *const c_void;
-                            let mut send_buffers = vec![];
-                            rmpi::Error::result_into_mpi_res(
-                                (||{
-                                    if !(sendbuf.is_null() || sendcounts.is_null() || displs.is_null()) {
-                                        for send_rank in
-                                                0..unsafe{Communicator::from_raw_ref(&comm)}
-                                                    .size().unwrap(){
-                                            let send_buffer_part = unsafe {
-                                                TypeDynamicBufferRef::from_raw_dynamic(
-                                                    sendbuf.add(
-                                                        (
-                                                            *displs.add(send_rank as usize)
-                                                             * sendtype.size()?
-                                                        ) as usize
-                                                    ) as *const c_void,
-                                                    *sendcounts.add(send_rank as usize),
-                                                    sendtype.as_raw()
-                                                )
-                                            };
-                                            send_buffers.push(send_buffer_part);
-                                        };
-                                    }
-                                    <Self as MpiInterceptionLayer>::scatterv(
-                                        |_rmpi_ctx,send_buffer, recv_buffer, root| {
-                                            unsafe {
-                                                root.scatterv_with(
-                                                    next_f.unwrap(),
-                                                    send_buffer,
-                                                    recv_buffer
-                                                )
-                                            }
-                                        },
-                                        unsafe { RmpiContext::create_unchecked_ref() },
-                                        &send_buffers, recv_buffer,
-                                        unsafe{Communicator::from_raw_ref(&comm)}.get_process(root),
-                                    )
-                                })()
-                            )
-                        }
-                    )
-                }
-            )
+            let recv_buffer =
+                unsafe { TypeDynamicBufferMut::from_raw_dynamic(recvbuf, recvcount, recvtype) };
+
+            rmpi::Error::result_into_mpi_res((|| {
+                let send_buffers =
+                    buffers_from_displs(sendbuf, sendcounts, displs, sendtype, comm)?;
+                <Self as MpiInterceptionLayer>::scatterv(
+                    |_rmpi_ctx, send_buffer, recv_buffer, root| unsafe {
+                        root.scatterv_with(next_f.unwrap(), send_buffer, recv_buffer)
+                    },
+                    unsafe { RmpiContext::create_unchecked_ref() },
+                    &send_buffers,
+                    recv_buffer,
+                    unsafe { Communicator::from_raw_ref(&comm) }.get_process(root),
+                )
+            })())
         }
     );
 }

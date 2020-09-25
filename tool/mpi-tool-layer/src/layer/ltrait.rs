@@ -8,8 +8,8 @@ use rmpi::pmpi_mode as rmpi;
 use self::rmpi::{
     datatype::RawDatatype,
     request::{Request, RequestSlice},
-    BufferMut, BufferRef, CStrMutPtr, Communicator, Group, MpiOp, Process, RmpiContext, RmpiResult,
-    Status, Tag,
+    CStrMutPtr, Communicator, Group, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
+    TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 
 pub trait MpiInterceptionLayer {
@@ -50,98 +50,93 @@ pub trait MpiInterceptionLayer {
         fn comm_free(rmpi_ctx: &RmpiContext, comm: Communicator) -> RmpiResult;
 
         #[inline]
-        fn send<Buf>(rmpi_ctx: &RmpiContext, buf: Buf, dest: Process, tag: Tag) -> RmpiResult
-        where
-            Buf: BufferRef;
+        fn send(
+            rmpi_ctx: &RmpiContext,
+            buf: TypeDynamicBufferRef,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult;
         #[inline]
-        fn bsend<Buf>(rmpi_ctx: &RmpiContext, buf: Buf, dest: Process, tag: Tag) -> RmpiResult
-        where
-            Buf: BufferRef;
+        fn bsend(
+            rmpi_ctx: &RmpiContext,
+            buf: TypeDynamicBufferRef,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult;
         #[inline]
-        fn ssend<Buf>(rmpi_ctx: &RmpiContext, buf: Buf, dest: Process, tag: Tag) -> RmpiResult
-        where
-            Buf: BufferRef;
+        fn ssend(
+            rmpi_ctx: &RmpiContext,
+            buf: TypeDynamicBufferRef,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult;
         #[inline]
-        fn rsend<Buf>(rmpi_ctx: &RmpiContext, buf: Buf, dest: Process, tag: Tag) -> RmpiResult
-        where
-            Buf: BufferRef;
+        fn rsend(
+            rmpi_ctx: &RmpiContext,
+            buf: TypeDynamicBufferRef,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult;
 
         #[inline]
-        fn isend<'b, Buf: 'b>(
+        fn isend<'b>(
             rmpi_ctx: &RmpiContext,
-            buf: Buf,
+            buf: TypeDynamicBufferRef<'b>,
             dest: Process,
             tag: Tag,
-        ) -> RmpiResult<Request<'b>>
-        where
-            Buf: BufferRef;
+        ) -> RmpiResult<Request<'b>>;
         #[inline]
-        fn ibsend<'b, Buf: 'b>(
+        fn ibsend<'b>(
             rmpi_ctx: &RmpiContext,
-            buf: Buf,
+            buf: TypeDynamicBufferRef<'b>,
             dest: Process,
             tag: Tag,
-        ) -> RmpiResult<Request<'b>>
-        where
-            Buf: BufferRef;
+        ) -> RmpiResult<Request<'b>>;
         #[inline]
-        fn issend<'b, Buf: 'b>(
+        fn issend<'b>(
             rmpi_ctx: &RmpiContext,
-            buf: Buf,
+            buf: TypeDynamicBufferRef<'b>,
             dest: Process,
             tag: Tag,
-        ) -> RmpiResult<Request<'b>>
-        where
-            Buf: BufferRef;
+        ) -> RmpiResult<Request<'b>>;
+        #[inline]
+        fn irsend<'b>(
+            rmpi_ctx: &RmpiContext,
+            buf: TypeDynamicBufferRef<'b>,
+            dest: Process,
+            tag: Tag,
+        ) -> RmpiResult<Request<'b>>;
 
         #[inline]
-        fn irsend<'b, Buf: 'b>(
+        fn recv(
             rmpi_ctx: &RmpiContext,
-            buf: Buf,
-            dest: Process,
-            tag: Tag,
-        ) -> RmpiResult<Request<'b>>
-        where
-            Buf: BufferRef;
-        #[inline]
-        fn recv<Buf>(
-            rmpi_ctx: &RmpiContext,
-            buf: Buf,
+            buf: TypeDynamicBufferMut,
             src: Process,
             tag: Tag,
             status_ignore: bool,
-        ) -> RmpiResult<Option<Status>>
-        where
-            Buf: BufferMut;
+        ) -> RmpiResult<Option<Status>>;
         #[inline]
-        fn irecv<'b, Buf: 'b>(
+        fn irecv<'b>(
             rmpi_ctx: &RmpiContext,
-            buf: Buf,
+            buf: TypeDynamicBufferMut<'b>,
             dest: Process,
             tag: Tag,
-        ) -> RmpiResult<Request<'b>>
-        where
-            Buf: BufferMut;
+        ) -> RmpiResult<Request<'b>>;
 
         #[inline]
-        fn sendrecv<SendBuf, RecvBuf>(
+        fn sendrecv(
             rmpi_ctx: &RmpiContext,
-            sendbuf: SendBuf,
+            sendbuf: TypeDynamicBufferRef,
             dest: Process,
             sendtag: Tag,
-            recvbuf: RecvBuf,
+            recvbuf: TypeDynamicBufferMut,
             src: Process,
             recvtag: Tag,
             status_ignore: bool,
-        ) -> RmpiResult<Option<Status>>
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult<Option<Status>>;
 
         #[inline]
-        fn bcast<Buf>(rmpi_ctx: &RmpiContext, buf: Buf, root: Process) -> RmpiResult
-        where
-            Buf: BufferMut;
+        fn bcast(rmpi_ctx: &RmpiContext, buf: TypeDynamicBufferMut, root: Process) -> RmpiResult;
 
         #[inline]
         fn get_count(
@@ -196,118 +191,88 @@ pub trait MpiInterceptionLayer {
 
         // should I really use Buffers of different datatypes??
         #[inline]
-        fn gather<SendBuf, RecvBuf>(
+        fn gather(
             rmpi_ctx: &RmpiContext,
-            sendbuf: SendBuf,
-            recvbuf: RecvBuf,
+            sendbuf: TypeDynamicBufferRef,
+            recvbuf: TypeDynamicBufferMut,
             root: Process,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
         #[inline]
-        fn gatherv<SendBuf, RecvBuf>(
+        fn gatherv(
             rmpi_ctx: &RmpiContext,
-            sendbuf: SendBuf,
-            recvbufs: &mut [RecvBuf],
+            sendbuf: TypeDynamicBufferRef,
+            recvbufs: &mut [TypeDynamicBufferMut],
             root: Process,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
         #[inline]
-        fn allgather<SendBuf, RecvBuf>(
+        fn allgather(
             rmpi_ctx: &RmpiContext,
-            sendbuf: SendBuf,
-            recvbuf: RecvBuf,
+            sendbuf: TypeDynamicBufferRef,
+            recvbuf: TypeDynamicBufferMut,
             comm: &Communicator,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
         #[inline]
-        fn allgatherv<SendBuf, RecvBuf>(
+        fn allgatherv(
             rmpi_ctx: &RmpiContext,
-            sendbuf: SendBuf,
-            recvbufs: &mut [RecvBuf],
+            sendbuf: TypeDynamicBufferRef,
+            recvbufs: &mut [TypeDynamicBufferMut],
             comm: &Communicator,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
 
         #[inline]
-        fn alltoall<SendBuf, RecvBuf>(
+        fn alltoall(
             rmpi_ctx: &RmpiContext,
-            sendbuf: SendBuf,
-            recvbuf: RecvBuf,
+            sendbuf: TypeDynamicBufferRef,
+            recvbuf: TypeDynamicBufferMut,
             comm: &Communicator,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
         #[inline]
-        fn alltoallv<SendBuf, RecvBuf>(
+        fn alltoallv(
             rmpi_ctx: &RmpiContext,
-            sendbufs: &[SendBuf],
-            recvbufs: &mut [RecvBuf],
+            sendbufs: &[TypeDynamicBufferRef],
+            recvbufs: &mut [TypeDynamicBufferMut],
             comm: &Communicator,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
 
         #[inline]
-        fn reduce<Buf>(
+        fn reduce(
             rmpi_ctx: &RmpiContext,
-            sendbuf: Buf,
-            recvbuf: Buf::Mut,
+            sendbuf: TypeDynamicBufferRef,
+            recvbuf: TypeDynamicBufferMut,
             op: MpiOp,
             root: Process,
-        ) -> RmpiResult
-        where
-            Buf: BufferRef;
+        ) -> RmpiResult;
         #[inline]
-        fn allreduce<Buf>(
+        fn allreduce(
             rmpi_ctx: &RmpiContext,
-            sendbuf: Buf,
-            recvbuf: Buf::Mut,
+            sendbuf: TypeDynamicBufferRef,
+            recvbuf: TypeDynamicBufferMut,
             op: MpiOp,
             comm: &Communicator,
-        ) -> RmpiResult
-        where
-            Buf: BufferRef;
+        ) -> RmpiResult;
 
         #[inline]
-        fn scan<Buf>(
+        fn scan(
             rmpi_ctx: &RmpiContext,
-            sendbuf: Buf,
-            recvbuf: Buf::Mut,
+            sendbuf: TypeDynamicBufferRef,
+            recvbuf: TypeDynamicBufferMut,
             op: MpiOp,
             comm: &Communicator,
-        ) -> RmpiResult
-        where
-            Buf: BufferRef;
+        ) -> RmpiResult;
 
         #[inline]
-        fn scatter<SendBuf, RecvBuf>(
+        fn scatter(
             rmpi_ctx: &RmpiContext,
-            sendbuf: SendBuf,
-            recvbuf: RecvBuf,
+            sendbuf: TypeDynamicBufferRef,
+            recvbuf: TypeDynamicBufferMut,
             root: Process,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
         #[inline]
-        fn scatterv<SendBuf, RecvBuf>(
+        fn scatterv(
             rmpi_ctx: &RmpiContext,
-            sendbufs: &[SendBuf],
-            recvbuf: RecvBuf,
+            sendbufs: &[TypeDynamicBufferRef],
+            recvbuf: TypeDynamicBufferMut,
             root: Process,
-        ) -> RmpiResult
-        where
-            SendBuf: BufferRef,
-            RecvBuf: BufferMut;
+        ) -> RmpiResult;
     );
 }
