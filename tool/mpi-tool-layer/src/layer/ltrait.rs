@@ -8,7 +8,7 @@ use rmpi::pmpi_mode as rmpi;
 use self::rmpi::{
     datatype::RawDatatype,
     request::{Request, RequestSlice},
-    CStrMutPtr, Communicator, Group, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
+    CStrMutPtr, Communicator, Error, Group, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
     TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 
@@ -48,6 +48,8 @@ pub trait MpiInterceptionLayer {
         ) -> RmpiResult<Communicator<'ctx>>;
         #[inline]
         fn comm_free(rmpi_ctx: &RmpiContext, comm: Communicator) -> RmpiResult;
+        #[inline]
+        fn abort(rmpi_ctx: &RmpiContext, comm: Communicator, error: Error) -> RmpiResult;
 
         #[inline]
         fn send(

@@ -154,6 +154,17 @@ impl RmpiContext {
     }
 
     #[inline]
+    pub fn abort_world(self, error: Error) -> RmpiResult {
+        let comm_world = unsafe { Communicator::from_raw(MPI_COMM_WORLD) };
+        comm_world.abort(error.into())
+    }
+    #[inline]
+    pub fn abort_self(self, error: Error) -> RmpiResult {
+        let comm_world = unsafe { Communicator::from_raw(MPI_COMM_SELF) };
+        comm_world.abort(error)
+    }
+
+    #[inline]
     pub fn wtime(&self) -> c_double {
         unsafe { MPI_Wtime() }
     }

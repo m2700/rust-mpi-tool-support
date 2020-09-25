@@ -9,7 +9,7 @@ use rmpi::pmpi_mode as rmpi;
 use self::rmpi::{
     datatype::RawDatatype,
     request::{Request, RequestSlice},
-    BufferMut, BufferRef, CStrMutPtr, Communicator, Group, Process, RmpiContext, Status,
+    BufferMut, BufferRef, CStrMutPtr, Communicator, Error, Group, Process, RmpiContext, Status,
     TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 use mpi_sys::pmpi::*;
@@ -180,6 +180,15 @@ where
                 |_rmpi_ctx, comm| unsafe { comm.free_with(next_f.unwrap()) },
                 unsafe { RmpiContext::create_unchecked_ref() },
                 unsafe { Communicator::from_raw(*comm) },
+            ))
+        }
+        #[inline]
+        fn abort(next_f: UnsafeBox, comm: MPI_Comm, errorcode: c_int) -> c_int {
+            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::abort(
+                |_rmpi_ctx, comm, error| unsafe { comm.abort_with(next_f.unwrap(), error) },
+                unsafe { RmpiContext::create_unchecked_ref() },
+                unsafe { Communicator::from_raw(comm) },
+                Error::from_mpi_res(errorcode).expect_err("errorcode cannot be MPI_SUCCESS"),
             ))
         }
 

@@ -158,4 +158,21 @@ impl<'ctx> Communicator<'ctx> {
     pub fn free(self) -> RmpiResult {
         unsafe { self.free_with(|comm| MPI_Comm_free(comm)) }
     }
+
+    tool_mode_item!(
+        #[inline]
+        pub unsafe fn abort_with<F>(self, mpi_abort: F, error: Error) -> RmpiResult
+        where
+            F: FnOnce(MPI_Comm, c_int) -> c_int,
+        {
+            let mpi_comm = *self;
+            let res = Error::from_mpi_res(mpi_abort(mpi_comm, error.into()));
+            forget(self);
+            res
+        }
+    );
+    #[inline]
+    pub fn abort(self, error: Error) -> RmpiResult {
+        unsafe { self.abort_with(|comm, errorcode| MPI_Abort(comm, errorcode), error) }
+    }
 }
