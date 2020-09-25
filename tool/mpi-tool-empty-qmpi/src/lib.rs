@@ -5,15 +5,15 @@ use rmpi::pmpi_mode as rmpi;
 
 struct MyQmpiLayer;
 impl MpiInterceptionLayer for MyQmpiLayer {
-    fn finalize<F>(next_f: F) -> rmpi::RmpiResult
+    fn finalize<F>(next_f: F, rmpi_ctx: rmpi::RmpiContext) -> rmpi::RmpiResult
     where
-        F: FnOnce() -> rmpi::RmpiResult,
+        F: FnOnce(rmpi::RmpiContext) -> rmpi::RmpiResult,
     {
         let fin_dbg_cnf = env::var("FINALIZE_DEBUG_CONFIRM");
         if fin_dbg_cnf.is_err() || fin_dbg_cnf.as_ref().map(|s| &**s) == Ok("1") {
             println!("called finalize (high level qmpi)");
         }
-        next_f()
+        next_f(rmpi_ctx)
     }
 }
 
