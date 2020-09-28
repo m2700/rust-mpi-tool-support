@@ -12,7 +12,9 @@ use self::rmpi::{
     TypeDynamicBufferMut, TypeDynamicBufferRef,
 };
 
-pub trait MpiInterceptionLayer {
+use crate::RawMpiInterceptionLayer;
+
+pub trait MpiInterceptionLayer: RawMpiInterceptionLayer {
     trait_layer_function!(
         #[inline]
         fn init(args: &mut &mut [CStrMutPtr]) -> RmpiResult<Option<RmpiContext>>;
