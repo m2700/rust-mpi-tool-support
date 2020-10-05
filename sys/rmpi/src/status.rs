@@ -6,7 +6,7 @@ use std::{
 
 local_mod!(
     use mpi_sys::*;
-    use crate::{Error, datatype::RawDatatype, RmpiResult};
+    use crate::{Error, datatype::RawDatatype, RmpiResult, TypeDynamicBufferMut, BufferRef};
 );
 
 #[derive(Clone, Copy)]
@@ -92,5 +92,15 @@ impl Status {
                 datatype,
             )
         }
+    }
+
+    // TODO: make me generic
+    #[inline]
+    pub fn received_part<'b>(
+        &self,
+        buf: TypeDynamicBufferMut<'b>,
+    ) -> RmpiResult<Option<TypeDynamicBufferMut<'b>>> {
+        let opt_count = self.get_count(&unsafe { RawDatatype::from_raw(buf.item_datatype()) })?;
+        Ok(opt_count.map(|count| buf.slice_to_mut(count as usize)))
     }
 }

@@ -248,11 +248,14 @@ impl MpiInterceptionLayer for MyQmpiLayer {
             bool,
         ) -> RmpiResult<Option<Status>>,
     {
-        let res = next_f(rmpi_ctx, buf.as_mut(), src, tag, status_ignore);
-        if res.is_ok() {
-            recv_data_record(buf.as_ref());
+        let status = next_f(rmpi_ctx, buf.as_mut(), src, tag, false)?
+            .expect("there should have been a status returned");
+        recv_data_record(status.received_part(buf)?.unwrap().as_ref());
+        if status_ignore {
+            Ok(None)
+        } else {
+            Ok(Some(status))
         }
-        res
     }
 
     fn sendrecv<F>(
@@ -278,7 +281,7 @@ impl MpiInterceptionLayer for MyQmpiLayer {
             bool,
         ) -> RmpiResult<Option<Status>>,
     {
-        let res = next_f(
+        let status = next_f(
             rmpi_ctx,
             sendbuf,
             dest,
@@ -286,13 +289,16 @@ impl MpiInterceptionLayer for MyQmpiLayer {
             recvbuf.as_mut(),
             src,
             recvtag,
-            status_ignore,
-        );
-        if res.is_ok() {
-            send_data_record(sendbuf, 1);
-            recv_data_record(recvbuf.as_ref());
+            false,
+        )?
+        .expect("there should have been a status returned");
+        send_data_record(sendbuf, 1);
+        recv_data_record(status.received_part(recvbuf)?.unwrap().as_ref());
+        if status_ignore {
+            Ok(None)
+        } else {
+            Ok(Some(status))
         }
-        res
     }
 
     fn bcast<F>(

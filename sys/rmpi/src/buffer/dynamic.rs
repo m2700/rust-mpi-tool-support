@@ -118,6 +118,18 @@ impl<'b> TypeDynamicBufferMut<'b> {
             datatype: self.datatype,
         }
     }
+
+    #[inline]
+    pub(crate) fn slice_to_mut(self, size: usize) -> TypeDynamicBufferMut<'b> {
+        let datatype_size = self
+            .datatype
+            .size()
+            .expect("could not get size of dynamic type") as usize;
+        TypeDynamicBufferMut {
+            buffer: &mut self.buffer[..(size * datatype_size)],
+            datatype: self.datatype,
+        }
+    }
 }
 impl<'b> BufferRef for TypeDynamicBufferMut<'b> {
     type Mut = TypeDynamicBufferMut<'b>;
