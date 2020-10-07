@@ -107,6 +107,8 @@ pub fn init(args_mut: &mut &mut [CStrMutPtr]) -> RmpiResult<Option<RmpiContext>>
 pub struct RmpiContext {
     not_send_marker: PhantomData<*mut ()>,
 }
+// having only a reference is fine as Communicator is also Sync
+unsafe impl Sync for RmpiContext {}
 impl Drop for RmpiContext {
     #[inline]
     fn drop(&mut self) {
