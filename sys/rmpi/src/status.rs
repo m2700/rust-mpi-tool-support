@@ -94,6 +94,27 @@ impl Status {
         }
     }
 
+    tool_mode_item!(
+        #[inline]
+        pub unsafe fn test_cancelled_with<F>(&self, test_cancelled: F) -> RmpiResult<bool>
+        where
+            F: FnOnce(*const MPI_Status, *mut c_int) -> c_int,
+        {
+            let mut flag = 0;
+            Error::from_mpi_res(test_cancelled(&self.into_raw(), &mut flag)).map(|()| {
+                if flag == 0 {
+                    false
+                } else {
+                    true
+                }
+            })
+        }
+    );
+    #[inline]
+    pub fn test_cancelled(&self) -> RmpiResult<bool> {
+        unsafe { self.test_cancelled_with(|status, flag| MPI_Test_cancelled(status, flag)) }
+    }
+
     // TODO: make me generic
     #[inline]
     pub fn received_part<'b>(
