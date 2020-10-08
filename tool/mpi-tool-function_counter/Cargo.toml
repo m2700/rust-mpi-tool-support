@@ -14,4 +14,3 @@ qmpi-tool-creator = { path = "../qmpi-tool-creator" }
 # qmpi-tool-creator = { path = "../qmpi-tool-creator" }
 mpi-tool-layer = { path = "../mpi-tool-layer", features = ["rmpi_support"] }
 mpi_func-id = { path = "../../sys/mpi_func-id" }
-rmpi = { path = "../../sys/rmpi" }

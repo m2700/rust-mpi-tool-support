@@ -1,7 +1,6 @@
 use std::env;
 
-use mpi_tool_layer::MpiInterceptionLayer;
-use rmpi::pmpi_mode as rmpi;
+use mpi_tool_layer::{rmpi, MpiInterceptionLayer};
 
 struct MyQmpiLayer;
 impl MpiInterceptionLayer for MyQmpiLayer {

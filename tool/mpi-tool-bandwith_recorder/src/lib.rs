@@ -3,13 +3,14 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering::Relaxed},
 };
 
-use self::rmpi::{
-    BufferRef, BufferRefKind, Communicator, MpiOp, Process, RmpiContext, RmpiResult, Status, Tag,
-    TypeDynamicBufferMut, TypeDynamicBufferRef,
+use mpi_tool_layer::{
+    rmpi::{
+        BufferRef, BufferRefKind, Communicator, MpiOp, Process, RmpiContext, RmpiResult, Status,
+        Tag, TypeDynamicBufferMut, TypeDynamicBufferRef,
+    },
+    MpiInterceptionLayer,
 };
-use mpi_tool_layer::MpiInterceptionLayer;
 use qmpi_tool_creator::install_qmpi_layer as install_mpi_layer;
-use rmpi::pmpi_mode as rmpi;
 
 pub mod tool {
     use super::install_mpi_layer;

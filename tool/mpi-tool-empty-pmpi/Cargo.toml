@@ -12,4 +12,3 @@ crate-type = ["cdylib"]
 [dependencies]
 pmpi-tool-creator = { path = "../pmpi-tool-creator" }
 mpi-tool-layer = { path = "../mpi-tool-layer", features = ["rmpi_support"] }
-rmpi = { path = "../../sys/rmpi", features = ["tool_mode"] }

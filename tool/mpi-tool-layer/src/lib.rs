@@ -160,3 +160,5 @@ macro_rules! trait_layer_function {
 mod layer;
 #[cfg(feature = "rmpi_support")]
 pub use layer::MpiInterceptionLayer;
+#[cfg(feature = "rmpi_support")]
+pub use rmpi::pmpi_mode as rmpi;

@@ -1,10 +1,11 @@
 use std::{convert::TryInto, env, sync::atomic::Ordering::Relaxed};
 
-use self::rmpi::{MpiOp, RmpiContext};
 use mpi_func_id::MPI_FUNCTION_COUNT;
-use mpi_tool_layer::{RawMpiInterceptionLayer, UnsafeBox};
+use mpi_tool_layer::{
+    rmpi::{MpiOp, RmpiContext},
+    RawMpiInterceptionLayer, UnsafeBox,
+};
 use qmpi_tool_creator::{install_qmpi_layer as install_mpi_layer, mpi_sys};
-use rmpi::pmpi_mode as rmpi;
 
 use mpi_func_id::MpiFunctionId as FId;
 
