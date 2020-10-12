@@ -101,11 +101,7 @@ impl<'c> Process<'c> {
                 .map(|recv_buffer| recv_buffer.as_mut_ptr())
                 .min()
                 .unwrap();
-            let recv_datatype = recv_buffers
-                .get(0)
-                .map(|buf| buf.item_datatype())
-                .unwrap_or_default();
-            
+
 
             let [mut recv_displs, mut recv_counts] = [vec![], vec![]];
             for (recvbuf, recvcount) in recv_buffers
