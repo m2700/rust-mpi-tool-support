@@ -92,7 +92,10 @@ impl<'c> Process<'c> {
 
             let (sendbuf, sendcount) = send_buffer.as_raw();
 
-            let recv_datatype_size = recv_buffers[0].datatype_size()? as usize;
+            let recv_datatype_size = recv_buffers
+                .get(0)
+                .map(|b| Ok(b.datatype_size()? as usize))
+                .unwrap_or(Ok(0))?;
             let recvbuf_ptr = recv_buffers
                 .iter_mut()
                 .map(|recv_buffer| recv_buffer.as_mut_ptr())
@@ -102,9 +105,7 @@ impl<'c> Process<'c> {
                 .get(0)
                 .map(|buf| buf.item_datatype())
                 .unwrap_or_default();
-            debug_assert!(recv_buffers
-                .iter()
-                .all(|buf| buf.item_datatype() == recv_datatype));
+            
 
             let [mut recv_displs, mut recv_counts] = [vec![], vec![]];
             for (recvbuf, recvcount) in recv_buffers
