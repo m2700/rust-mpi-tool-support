@@ -765,11 +765,13 @@ where
 
         #[inline]
         fn request_free(next_f: UnsafeBox, request: *mut MPI_Request) -> c_int {
-            rmpi::Error::result_into_mpi_res(<Self as MpiInterceptionLayer>::request_free(
-                |_rmpi_ctx, request| unsafe { request.free_with(next_f.unwrap()) },
-                unsafe { RmpiContext::create_unchecked_ref() },
-                unsafe { Request::from_raw(*request) },
-            ))
+            rmpi::Error::result_into_mpi_res(unsafe {
+                <Self as MpiInterceptionLayer>::request_free(
+                    |_rmpi_ctx, request| request.free_with(next_f.unwrap()),
+                    RmpiContext::create_unchecked_ref(),
+                    Request::from_raw(*request),
+                )
+            })
         }
         #[inline]
         fn cancel(next_f: UnsafeBox, request: *mut MPI_Request) -> c_int {

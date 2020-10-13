@@ -195,7 +195,7 @@ pub trait MpiInterceptionLayer: RawMpiInterceptionLayer {
         ) -> RmpiResult<Option<&'statuses mut [Status]>>;
 
         #[inline]
-        fn request_free(rmpi_ctx: &RmpiContext, request: Request) -> RmpiResult;
+        unsafe fn request_free(rmpi_ctx: &RmpiContext, request: Request) -> RmpiResult;
         #[inline]
         fn cancel(rmpi_ctx: &RmpiContext, request: Request) -> RmpiResult;
 
