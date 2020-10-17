@@ -156,6 +156,8 @@ macro_rules! trait_layer_function {
     };
 }
 
+pub use mpi_sys::pmpi as mpi_sys;
+
 #[cfg(feature = "rmpi_support")]
 mod layer;
 #[cfg(feature = "rmpi_support")]
