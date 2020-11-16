@@ -12,7 +12,7 @@ cargo build
 ### The compiler needs to be able to find qmpi in your system:
 + make sure libqmpi.a and qmpi.h are both in a directory where the compiler can find them
 + setting the following variables can help, depending on your system: CPATH, DYLD_LIBRARY_PATH, LD_LIBRARY_PATH, LIBRARY_PATH
-+ the [original qmpi](https://github.com/caps-tum/qmpi) and [my own branch](https://github.com/m2700/qmpi) are both compatible
++ the [qmpi prototype branch MPI-v3](https://github.com/caps-tum/qmpi/tree/MPI-v3) and [my own branch](https://github.com/m2700/qmpi) are both compatible
 
 ## Compile with benchmark settings (zero optimization for all tools):
 ```
