@@ -55,15 +55,15 @@ async fn download_file(uri: Uri, file_path: &Path, patch: &[[&str; 2]]) {
 #[tokio::main]
 async fn main() {
     #[cfg(feature = "use_git_header")]
-    let qmpi_h_uri = "https://raw.githubusercontent.com/caps-tum/qmpi/master/qmpi.h"
+    let qmpi_h_uri = "https://raw.githubusercontent.com/caps-tum/qmpi/MPI-v3/qmpi.h"
         .parse()
         .unwrap();
     #[cfg(feature = "bundled")]
-    let qmpi_c_uri = "https://raw.githubusercontent.com/caps-tum/qmpi/master/qmpi.c"
+    let qmpi_c_uri = "https://raw.githubusercontent.com/caps-tum/qmpi/MPI-v3/qmpi.c"
         .parse()
         .unwrap();
     #[cfg(feature = "bundled")]
-    let qmpi_arrays_h_uri = "https://raw.githubusercontent.com/caps-tum/qmpi/master/arrays.h"
+    let qmpi_arrays_h_uri = "https://raw.githubusercontent.com/caps-tum/qmpi/MPI-v3/arrays.h"
         .parse()
         .unwrap();
 
